@@ -1,0 +1,9 @@
+*.pyc
+*.pth.tar
+*.nii*
+__pycache__
+logs
+new-logs
+tmp_models
+mermaid
+*.swp

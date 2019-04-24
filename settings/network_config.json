@@ -9,12 +9,13 @@
         "dataset": "pseudo_2D",
         "pregis_net":{
             "momentum_net": {
-                "name": "MomentumNet"
+                "name": "MomentumNet",
+                "gamma_mermaid": 1
             },
             "recons_net": {
                 "name": "VaeNet",
                 "gamma_recons": 1,
-                "use_TV_loss": true
+                "use_TV_loss": false
             },
             "pretrain_epochs": 500,
             "join_two_networks": false
@@ -28,7 +29,7 @@
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
-                   1500,
+                   1000,
                    3000,
                    5000
                 ],

@@ -2,6 +2,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler 
 import torch.nn.functional as F
 import sys 
 import os
@@ -46,14 +48,6 @@ def weights_init(m):
 def create_model(config):
     name = config['name']
     if name == 'pregis_net':
-        #config = config[name]
-        n_of_feature = config['n_of_feature']
-        bn = config['bn']
-        dp = config['dp']
-        img_sz = config['img_sz']
-        gamma_recons = config[name]['gamma_recons']
-        dim = config['dim']
-        recons_loss = config[name]['recons_loss']
         model = PregisNet(config)
     else:
         raise ValueError("Model Not supported")

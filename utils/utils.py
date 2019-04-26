@@ -45,10 +45,10 @@ def weights_init(m):
         nn.init.constant_(m.bias.data,0)
 
 
-def create_model(config):
-    name = config['name']
+def create_model(network_config):
+    name = network_config['name']
     if name == 'pregis_net':
-        model = PregisNet(config)
+        model = PregisNet(network_config)
     else:
         raise ValueError("Model Not supported")
     model.cuda()

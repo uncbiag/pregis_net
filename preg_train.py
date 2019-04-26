@@ -17,18 +17,20 @@ import json
 
 
 def train_model(model, train_data_loader, validate_data_loader, optimizer, scheduler,
-                config, my_name, my_model_folder, model_path=None):
-    n_epochs = 5000
+                network_config, my_name, my_model_folder, model_path=None):
+    n_epochs = network_config['train']['n_of_epochs']
     current_epoch = 0
-    batch_size = config['train']['batch_size']
+    batch_size = network_config['train']['batch_size']
     iters_per_epoch = len(train_data_loader.dataset)//batch_size
     val_iters_per_epoch = len(validate_data_loader.dataset)//batch_size
-    summary_batch_num = min(5, iters_per_epoch)
+    summary_batch_period = min(network_config['train']['min_summary_period'], iters_per_epoch)
+    validate_epoch_period = network_config['train']['validate_epoch_period']
+   
     print('batch_size:', str(batch_size))
     print('iters_per_epoch:', str(iters_per_epoch))
     print('val_iters_per_epoch:', str(val_iters_per_epoch))
-    print('summery_batch_num:', str(summary_batch_num))
-
+    print('summary_batch_period:', str(summary_batch_period))
+    print("validate_epoch_period:", str(validate_epoch_period))
 
     writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 'logs', my_name))
 
@@ -83,20 +85,20 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                     print("Warning: {} not exist in loss_dict. Adding zero".format(loss_key))
                     epoch_loss_dict[loss_key] += 0.0
 
-            if (i+1) % summary_batch_num == 0: # print summary every k batches
+            if (i+1) % summary_batch_period == 0: # print summary every k batches
                 print('====>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, m_sim_loss:{:.6f}, r_sim_loss:{:.6f}, sim_loss:{:.6f}, lr:{:.6f}'.format(
                     current_epoch+1,
                     global_step,
-                    epoch_loss_dict['all_loss']/summary_batch_num,
-                    epoch_loss_dict['recons_loss']/summary_batch_num,
-                    epoch_loss_dict['mermaid_sim_loss']/summary_batch_num,
-                    epoch_loss_dict['recons_sim_loss']/summary_batch_num,
-                    epoch_loss_dict['sim_loss']/summary_batch_num,
+                    epoch_loss_dict['all_loss']/summary_batch_period,
+                    epoch_loss_dict['recons_loss']/summary_batch_period,
+                    epoch_loss_dict['mermaid_sim_loss']/summary_batch_period,
+                    epoch_loss_dict['recons_sim_loss']/summary_batch_period,
+                    epoch_loss_dict['sim_loss']/summary_batch_period,
                     optimizer.param_groups[0]['lr'])
                 )
 
                 for loss_key in epoch_loss_dict:
-                    writer.add_scalar('training/training_{}'.format(loss_key), epoch_loss_dict[loss_key]/summary_batch_num, global_step=global_step)
+                    writer.add_scalar('training/training_{}'.format(loss_key), epoch_loss_dict[loss_key]/summary_batch_period, global_step=global_step)
 
                 image_summary = make_image_summary(moving_image, target_image, moving_warped, moving_warped_recons, phi)
                 for key, value in image_summary.items():
@@ -115,7 +117,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 
 
-        if current_epoch % 10 == 0: #validate every k epochs
+        if current_epoch % validate_epoch_period == 0: #validate every k epochs
             with torch.no_grad():
                 model.eval()
                 eval_loss_dict = {
@@ -177,31 +179,32 @@ def train_network():
 
     model_folder = None
     if is_continue:
-        model_folder = "/playpen/xhs400/Research/PycharmProjects/pregis_net/main/tmp_models/my_model_20190324-011739"
+        model_folder = os.path.join(os.path.dirname(__file__), "/main/tmp_models/my_model_20190324-011739")
         my_name = model_folder.split('/')[-1]
     if model_folder is not None:
-        config_file = os.path.join(model_folder, 'network_config.json')
+        network_config_file = os.path.join(model_folder, 'network_config.json')
+        mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
     else:
-        config_file = "/playpen/xhs400/Research/PycharmProjects/pregis_net/main/settings/network_config.json"
-    mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/mermaid_config.json')
+        network_config_file = os.path.join(os.path.dirname(__file__), "settings/network_config.json")
+        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/mermaid_config.json')
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
-    with open(config_file) as f:
-        config = json.load(f)
+    with open(network_config_file) as f:
+        network_config = json.load(f)
     sigma = mermaid_config['model']['registration_model']['similarity_measure']['sigma']
-    gamma_recons = config['model']['pregis_net']['recons_net']['gamma_recons']
-    gamma_mermaid = config['model']['pregis_net']['momentum_net']['gamma_mermaid']
-    use_TV_loss = config['model']['pregis_net']['recons_net']['use_TV_loss']
-
+    gamma_recons = network_config['model']['pregis_net']['recons_net']['gamma_recons']
+    gamma_mermaid = network_config['model']['pregis_net']['momentum_net']['gamma_mermaid']
+    use_TV_loss = network_config['model']['pregis_net']['recons_net']['use_TV_loss']
+    join_two_networks = network_config['model']['pregis_net']['join_two_networks']
     model_path = None
     #if is_continue:
         #model_path = os.path.join(model_folder, '299.pth.tar')
          #model_path = 'tmp_models/tmp_model_direct_momentum_' + my_name + '_409.pth.tar'
 
 
-    model_config = config['model']
-    train_config = config['train']
-    validate_config = config['validate']
+    model_config = network_config['model']
+    train_config = network_config['train']
+    validate_config = network_config['validate']
     
     #target_file = model_config['target_file']
     #image_io = py_fio.ImageIO()
@@ -209,26 +212,28 @@ def train_network():
     #model_config['img_sz'] = [train_config['batch_size'],1 ] + list(target_image.shape[2:])
     
     train_data_loader, validate_data_loader, _ = create_dataloader(model_config, train_config, validate_config)
+    model['mermaid_config_file'] = mermaid_config_file
     model = create_model(model_config)
     optimizer, scheduler = create_optimizer(train_config, model)
    
     #criterion = create_loss(train_config)
     if not is_continue:
-        my_name = "model_{}_sm{:.3f}_gm_{:.3f}_gr{:.3f}_recons{}".format(
+        my_name = "model_{}_sm{:.3f}_gm{:.3f}_gr{:.3f}_loss{}_{}".format(
             my_time,
             sigma,
             gamma_mermaid,
             gamma_recons,
-            "TV" if use_TV_loss else "L1")
+            "TV" if use_TV_loss else "L1",
+            "Join" if join_two_networks else "NotJ")
         model_folder = os.path.join(os.path.dirname(__file__), 'tmp_models', 'vae', my_name)
         os.system('mkdir -p ' + model_folder)
-        os.system('cp ' + config_file + ' ' + model_folder)
+        os.system('cp ' + network_config_file + ' ' + model_folder)
         os.system('cp ' + mermaid_config_file + ' ' + model_folder)
         log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
         os.system('mkdir -p ' + log_folder)
 
 
-    train_model(model, train_data_loader, validate_data_loader, optimizer, scheduler, config, my_name, model_folder, model_path=model_path)
+    train_model(model, train_data_loader, validate_data_loader, optimizer, scheduler, network_config, my_name, model_folder, model_path=model_path)
 
     return
 

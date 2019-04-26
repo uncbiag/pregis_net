@@ -56,17 +56,18 @@ class PregisNet(nn.Module):
         else:
             self.recons_criterion_TV = None 
 
+        self.mermaid_config_file = model_config['mermaid_config_file']
         self.mermaid_unit = None
-        self.use_map = True
-        self.map_low_res_factor = 0.5
+        #self.use_map = True
+        #self.map_low_res_factor = 0.5
 
         self.spacing = 1./(np.array(self.img_sz[2:])-1)
         self.init_mermaid_env(spacing=self.spacing)
 
-        self.rec_phiWarped = None
+        #self.rec_phiWarped = None
 
-        self.img_recons = None
-        self.momentum = None
+        #self.img_recons = None
+        #self.momentum = None
         return    
 
     #######################
@@ -75,8 +76,8 @@ class PregisNet(nn.Module):
 
     def init_mermaid_env(self, spacing):
         params = pars.ParameterDict()
-        params.load_JSON(os.path.join(os.path.dirname(__file__), '../settings/mermaid_config.json'))
-       
+        #params.load_JSON(os.path.join(os.path.dirname(__file__), '../settings/mermaid_config.json'))
+        params.load_JSON(self.mermaid_config_file)
         sm_factory = smf.SimilarityMeasureFactory(self.spacing)
         self.sim_criterion = sm_factory.create_similarity_measure(params['model']['registration_model'])
         model_name = params['model']['registration_model']['type']
@@ -129,31 +130,31 @@ class PregisNet(nn.Module):
         pre_factor = 1./(np.exp((cur_epoch-self.pretrain_epochs)/self.pretrain_epochs*10)+1)        
         recons_sim_loss = self.sim_criterion.compute_similarity_multiNC(self.moving_warped_recons, target)
         loss_dict['recons_sim_loss'] = recons_sim_loss 
-        sim_loss = pre_factor*mermaid_sim_loss + fine_factor*recons_sim_loss
-        loss_dict['sim_loss'] = sim_loss
 
-        if self.join_two_networks:
-            # controlling recons loss: do not backpropogate through momentum net
-            # using moving_warped_recons_det, which is obtained from detached movining warped
-            recons_loss_L1 = self.recons_criterion_L1(self.moving_warped.detach(), self.moving_warped_recons_det)
-            loss_dict['recons_loss_L1'] = recons_loss_L1
-            if self.recons_criterion_TV is not None:
-                recons_loss_TV = self.recons_criterion_TV(self.moving_warped.detach(), self.moving_warped_recons_det)
-                loss_dict['recons_loss_TV'] = recons_loss_TV
-                recons_loss = recons_loss_L1 + recons_loss_TV
-            else:
-                recons_loss = recons_loss_L1
-            loss_dict['recons_loss'] = recons_loss 
+
+        # Recons losses do not backpropogate through momentum net
+        # using moving_warped_recons_det, which is obtained from detached moving warped
+        recons_loss_L1 = self.recons_criterion_L1(self.moving_warped.detach(), self.moving_warped_recons_det)
+        loss_dict['recons_loss_L1'] = recons_loss_L1
+        if self.recons_criterion_TV is not None:
+            recons_loss_TV = self.recons_criterion_TV(self.moving_warped_detach(), self.moving_warped_recons_det)
+            loss_dict['recons_loss_TV'] = recons_loss_TV
+            recons_loss = recons_loss_L1 + recons_loss_TV
         else:
-            recons_loss_L1 = self.recons_criterion_L1(moving, self.moving_warped_recons)
-            loss_dict['recons_loss_L1'] = recons_loss_L1
-            if self.recons_criterion_TV is not None:
-                recons_loss_TV = self.recons_criterion_TV(moving, self.moving_warped_recons)
-                loss_dict['recons_loss_TV'] = recons_loss_TV
-                recons_loss = recons_loss_L1 + recons_loss_TV
-            else:
-                recons_loss = recons_loss_L1
-            loss_dict['recons_loss'] = recons_loss 
+            recons_loss = recons_loss_L1
+        loss_dict['recons_loss'] = recons_loss
+
+
+                         
+        if self.join_two_networks:
+            # using weighted similarity_loss
+            sim_loss = pre_factor*mermaid_sim_loss + fine_factor*recons_sim_loss
+            loss_dict['sim_loss'] = sim_loss
+
+       else:
+            # using separate similarity_loss for two networks
+            sim_loss = mermaid_sim_loss + recons_sim_loss
+            loss_dict['sim_loss'] = sim_loss
              
         # mu, logvar have been detached
         kld_element = self.mu.pow(2).add_(self.logvar.exp()).mul_(-1).add_(1).add_(self.logvar)
@@ -209,22 +210,19 @@ class PregisNet(nn.Module):
         momentum = self.momentum_net(moving, target)
         moving_warped, phi, phi_inv = self.mermaid_shoot(moving, target, momentum)
 
+
+        # forward vae, detached from momentum net 
+        moving_warped_recons_det, mu_det, logvar_det = self.recons_net(moving_warped.detached())
+        self.mu = mu_det
+        self.logvar = logvar_det
+        self.moving_warped_recons_det = moving_warped_recons_det
+
         if self.join_two_networks:
-            # forward vae, detached from momentum net
-            moving_warped_recons_det, mu_det, logvar_det = self.recons_net(moving_warped.detach())
-            self.moving_warped_recons_det = moving_warped_recons_det
-            self.mu = mu_det
-            self.logvar = logvar_det
-
             # forward vae, attached to momentum net
-            moving_warped_recons, _, _ = self.recons_net(moving_warped)
-
-        else: # use moving image
-            moving_warped_recons, mu, logvar = self.recons_net(moving)
-            self.mu = mu
-            self.logvar = logvar
- 
-        self.moving_warped_recons = moving_warped_recons
+            moving_warped_recons, _ _ = self.recons_net(moving_warped)
+             self.moving_warped_recons = moving_warped_recons
+         
+        
         self.phi = phi
         self.phi_inv = phi_inv
 

@@ -24,7 +24,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
     iters_per_epoch = len(train_data_loader.dataset)//batch_size
     val_iters_per_epoch = len(validate_data_loader.dataset)//batch_size
     summary_batch_period = min(network_config['train']['min_summary_period'], iters_per_epoch)
-    validate_epoch_period = network_config['train']['validate_epoch_period']
+    validate_epoch_period = network_config['validate']['validate_epoch_period']
    
     print('batch_size:', str(batch_size))
     print('iters_per_epoch:', str(iters_per_epoch))
@@ -172,7 +172,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 
 def train_network():
-
+    dataset = 'pseudo_2D'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
     is_continue = False
@@ -185,8 +185,8 @@ def train_network():
         network_config_file = os.path.join(model_folder, 'network_config.json')
         mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
     else:
-        network_config_file = os.path.join(os.path.dirname(__file__), "settings/network_config.json")
-        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/mermaid_config.json')
+        network_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/network_config.json".format(dataset))
+        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config.json'.format(dataset))
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
     with open(network_config_file) as f:
@@ -212,7 +212,7 @@ def train_network():
     #model_config['img_sz'] = [train_config['batch_size'],1 ] + list(target_image.shape[2:])
     
     train_data_loader, validate_data_loader, _ = create_dataloader(model_config, train_config, validate_config)
-    model['mermaid_config_file'] = mermaid_config_file
+    model_config['mermaid_config_file'] = mermaid_config_file
     model = create_model(model_config)
     optimizer, scheduler = create_optimizer(train_config, model)
    

@@ -5,31 +5,28 @@ import os
 import sys
 import numpy as np
 
-mermaid_path = "/playpen/xhs400/Research/FPIR/mermaid"
-sys.path.append(mermaid_path)
-sys.path.append(os.path.join(mermaid_path, 'pyreg'))
-sys.path.append(os.path.join(mermaid_path, 'pyreg/libraries'))
-
-import pyreg.fileio as py_fio
+from utils.utils import *
 import glob
 
 
 class Pseudo2DDataset(Dataset):
+
     def __init__ (self, mode='training'):
-        self.mode = mode
-        self.data_path = os.path.join(os.path.dirname(__file__), '../../data_2d_syn/tumor_test')
-#        self.no_tumor_data_path = os.path.join(os.path.dirname(__file__), '../../data_2d_syn/no_tumor_test')
+        root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net' 
+        data_path = os.path.join(root_folder, 'pseudo_2D')
         
         if mode == 'training':
-            self.image_files = sorted(glob.glob(os.path.join(self.data_path, '*.nii.gz')))[20:100]
+            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[20:100]
         elif mode == 'validation':
-            self.image_files = sorted(glob.glob(os.path.join(self.data_path, '*.nii.gz')))[0:20]
+            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[0:20]
         elif mode == 'testing':
-            self.image_files = sorted(glob.glob(os.path.join(self.data_path, '*.nii.gz')))[0:100]
+            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[0:100]
         else:
             raise ValueError('Mode Wrong!')
 
-        self.atlas_file = os.path.join(self.data_path, '../atlas_2D.nii.gz')
+        self.atlas_file = os.path.join(root_folder, 'atlas_folder', 'atlas_2D.nii.gz')
+
+
     def __len__(self):
         return len(self.image_files)
 

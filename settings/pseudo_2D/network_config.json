@@ -1,0 +1,49 @@
+{
+    "model":{
+        "name": "pregis_net",
+        "n_of_feature": 32,
+        "activation_function": "LeakyReLU",
+        "bn": false,
+        "dp": false,
+        "dp_p": 0.2,
+        "dataset": "pseudo_2D",
+        "pregis_net":{
+            "momentum_net": {
+                "name": "MomentumNet",
+                "gamma_mermaid": 1
+            },
+            "recons_net": {
+                "name": "VaeNet",
+                "gamma_recons": 1,
+                "use_TV_loss": true
+            },
+            "pretrain_epochs": 500,
+            "join_two_networks": false
+        }
+    },
+    "train":{
+        "n_of_epochs":5000,
+        "batch_size":20,
+        "min_summary_period":15,
+        "optimizer":{
+            "name": "ADAM",
+            "lr": 0.001,
+            "scheduler":{
+                "name": "multistepLR",
+                "milestones": [
+                   1000,
+                   2000,
+                   4000
+                ],
+                "gamma": 0.1
+            }
+        }
+    },
+    "validate":{
+        "batch_size":20,
+        "validate_epoch_period":5,
+        "validate_interval": 20
+    },
+    "test":{
+    }
+}

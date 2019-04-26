@@ -9,7 +9,7 @@
             "forward_model": {
                 "adjoin_on": true,
                 "atol": 1e-05,
-                "number_of_time_steps": 10,
+                "number_of_time_steps": 20,
                 "rtol": 1e-05,
                 "smoother": {
                     "multi_gaussian_stds": [
@@ -62,7 +62,7 @@
                     "stride":[[0.25,0.25,0.25],[0.25,0.25],[0.25]],
                     "dilation":[[2,2,2],[2,2],[1]]
                 },
-                "sigma": 0.1,
+                "sigma": 1,
                 "type": "ncc"
             },
             "spline_order": 1,

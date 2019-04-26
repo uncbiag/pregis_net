@@ -69,6 +69,7 @@ def create_dataloader(model_config, tr_config, va_config):
 
     my_train_dataset = MyDataset(mode='training')
     my_validate_dataset = MyDataset(mode='validation')
+    my_test_dataset = MyDataset(mode='testing')
     atlas_file = my_train_dataset.atlas_file
     print(atlas_file)
     image_io = py_fio.ImageIO()
@@ -76,11 +77,12 @@ def create_dataloader(model_config, tr_config, va_config):
 
     train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True)
     validate_data_loader = DataLoader(my_validate_dataset, batch_size=va_config['batch_size'], shuffle=False)
+    test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False)
     model_config['img_sz'] = [tr_config['batch_size'], 1] + list(target_image.shape[2:])
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc
     model_config['target_spacing'] = target_spacing
-    return train_data_loader, validate_data_loader
+    return train_data_loader, validate_data_loader, test_data_loader
 
 def create_optimizer(config, model):
     method = config['optimizer']['name']

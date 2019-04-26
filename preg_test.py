@@ -8,12 +8,9 @@ import numpy as np
 
 
 from utils import registration_method
-#mermaid_path='/playpen/xhs400/Research/FPIR/mermaid'
-#sys.path.append(mermaid_path)
-#sys.path.append(os.path.join(mermaid_path, 'pyreg'))
-#sys.path.append(os.path.join(mermaid_path, 'pyreg/libraries'))
-#sys.path.append('./modules')
+
 import pyreg.fileio as py_fio
+import pyreg.utils as py_utils
 from modules.pregis_net import PregisNet
 from torch.utils.data import DataLoader, Dataset
 from torch.autograd import Variable
@@ -22,31 +19,39 @@ import json
 from utils.utils import *
 
 
-def test_model(model, validate_data_loader, config, my_model_folder):
+def test_model(model, test_data_loader, config, my_model_folder):
     result_folder = os.path.join(my_model_folder, 'test')
     os.system('mkdir -p {}'.format(result_folder))
     image_io = py_fio.ImageIO()
+    map_io = py_fio.MapIO()
+    _id = py_utils.identity_map_multiN(np.array(config['model']['img_sz']), config['model']['target_spacing'])
+    identity_map = torch.from_numpy(_id).cuda()
     with torch.no_grad():
         model.eval()
-        for i, (moving_image, target_image) in enumerate(validate_data_loader):
+        for i, (moving_image, target_image) in enumerate(test_data_loader):
             moving_image = moving_image.cuda()
             target_image = target_image.cuda()
+            
+            moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=0)
 
-            moving_warped, moving_warped_recons, phi = model(moving_image, target_image)
-
-            batch_size = config['train']['batch_size']
+            batch_size = config['validate']['batch_size']
             for j in range(batch_size):
                 moving_file = os.path.join(result_folder,'test_{}.nii.gz'.format(i*batch_size+j))
                 warped_file = os.path.join(result_folder, 'warped_{}.nii.gz'.format(i*batch_size+j))
                 recons_file = os.path.join(result_folder, 'recons_{}.nii.gz'.format(i*batch_size+j))
+                diff_file = os.path.join(result_folder, 'diff_{}.nii.gz'.format(i*batch_size+j))
+                map_file = os.path.join(result_folder, 'disp_map_{}.nii.gz'.format(i*batch_size+j))
                 image_io.write(moving_file, torch.squeeze(moving_image[j,...]), hdr=config['model']['target_hdrc'])
                 image_io.write(warped_file, torch.squeeze(moving_warped[j,...]), hdr=config['model']['target_hdrc'])
                 image_io.write(recons_file, torch.squeeze(moving_warped_recons[j,...]), hdr=config['model']['target_hdrc'])
+                image_io.write(diff_file, torch.squeeze(moving_warped[j,...]-moving_warped_recons[j,...]), hdr=config['model']['target_hdrc'])
+                disp_map = phi[i,...] - identity_map[i,...]
+                map_io.write(filename=map_file, data=torch.squeeze(disp_map), hdr=config['model']['target_hdrc'])
              
             
 
 def test_network():
-    model_folder = "tmp_models/vae/my_model_20190416-223818_sigma0.500_gr1.000_reconsL1" 
+    model_folder = "tmp_models/vae/model_20190424-175734_sm1.000_gm_1.000_gr1.000_reconsTV" 
     model_path = os.path.join(model_folder, 'best_eval.pth.tar')
     mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
     config_file = os.path.join(model_folder, 'network_config.json')
@@ -59,18 +64,14 @@ def test_network():
     model_config = config['model']
     train_config = config['train']
     validate_config = config['validate']
-    _, validate_data_loader = create_dataloader(model_config, train_config, validate_config)
+    _, _, test_data_loader = create_dataloader(model_config, train_config, validate_config)
  
-    #image_io = py_fio.ImageIO()
-    #atlas_file = validate_data_loader.atlas_file
-
-    #target_image, target_hdrc, target_spacing,_ = image_io.read_to_nc_format(atlas_file)
     model = create_model(model_config)
 
     network_state = torch.load(model_path)
     model.load_state_dict(network_state['model_state_dict'])
-
-    test_model(model, validate_data_loader, config, model_folder)
+    print(network_state['epoch'])
+    test_model(model, test_data_loader, config, model_folder)
 
 
 

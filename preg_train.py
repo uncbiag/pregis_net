@@ -208,7 +208,7 @@ def train_network():
     #target_image, target_hdrc, target_spacing, _ = image_io.read_to_nc_format(target_file, silent_mode=True)
     #model_config['img_sz'] = [train_config['batch_size'],1 ] + list(target_image.shape[2:])
     
-    train_data_loader, validate_data_loader = create_dataloader(model_config, train_config, validate_config)
+    train_data_loader, validate_data_loader, _ = create_dataloader(model_config, train_config, validate_config)
     model = create_model(model_config)
     optimizer, scheduler = create_optimizer(train_config, model)
    

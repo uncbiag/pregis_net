@@ -6,7 +6,7 @@
         "bn": false,
         "dp": false,
         "dp_p": 0.2,
-        "dataset": "pseudo_2D",
+        "dataset": "pseudo_3D",
         "pregis_net":{
             "momentum_net": {
                 "name": "MomentumNet",
@@ -15,17 +15,17 @@
             "recons_net": {
                 "name": "VaeNet",
                 "gamma_recons": 1,
-                "use_TV_loss": false
+                "use_TV_loss": true
             },
             "pretrain_epochs": 500,
-            "join_two_networks": false
+            "join_two_networks": true
         }
     },
     "train":{
-        "batch_size":20,
+        "batch_size":1,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.001,
+            "lr": 0.00001,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
@@ -38,7 +38,7 @@
         }
     },
     "validate":{
-        "batch_size":20,
+        "batch_size":1,
         "validate_interval": 20
     },
     "test":{

@@ -56,7 +56,6 @@ class PregisNet(nn.Module):
         else:
             self.recons_criterion_TV = None 
 
-
         self.mermaid_unit = None
         self.use_map = True
         self.map_low_res_factor = 0.5
@@ -69,12 +68,14 @@ class PregisNet(nn.Module):
         self.img_recons = None
         self.momentum = None
         return    
- 
+
+    #######################
+    #Initialize Mermaid Unit (Shooting)
+    #######################
 
     def init_mermaid_env(self, spacing):
         params = pars.ParameterDict()
         params.load_JSON(os.path.join(os.path.dirname(__file__), '../settings/mermaid_config.json'))
-        #self.sim_criterion = smf.CustLNCCSimilarity(spacing, params)
        
         sm_factory = smf.SimilarityMeasureFactory(self.spacing)
         self.sim_criterion = sm_factory.create_similarity_measure(params['model']['registration_model'])
@@ -85,6 +86,7 @@ class PregisNet(nn.Module):
         sim_sigma = params['model']['registration_model']['similarity_measure']['sigma']
 
 
+        ## Currently Must use map_low_res_factor = 0.5
         if self.map_low_res_factor is not None:
             self.lowResSize = _get_low_res_size_from_size(self.img_sz, self.map_low_res_factor)
             self.lowResSpacing = _get_low_res_spacing_from_spacing(spacing, self.img_sz, self.lowResSize)
@@ -93,8 +95,10 @@ class PregisNet(nn.Module):
             else:
                 mf = py_mf.ModelFactory(self.img_sz, self.spacing, self.lowResSize, self.lowResSpacing)
 
-        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=False)
+        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=True)
 
+
+        ## Currently Must use map
         if self.use_map:
             # create the identity map [0,1]^d, since we will use a map-based implementation
             _id = py_utils.identity_map_multiN(self.img_sz, spacing)
@@ -103,29 +107,40 @@ class PregisNet(nn.Module):
                 # create a lower resolution map for the computations
                 lowres_id = py_utils.identity_map_multiN(self.lowResSize, self.lowResSpacing)
                 self.lowResIdentityMap = torch.from_numpy(lowres_id).cuda()
-        #params['model']['registration_model']['similarity_measure']['type'] = self.loss_type
         self.mermaid_unit = model.cuda()
         self.mermaid_criterion = criterion
 
         return
 
+    #########################
+    #  Calcuate Loss functions
+    #########################
+
+
     def cal_pregis_loss(self, moving, target, cur_epoch, mode):
-        mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(self.identityMap,self.phi,moving,target,None,self.mermaid_unit.get_variables_to_transfer_to_loss_function(),None)
+        mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(phi0=self.identityMap,phi1=self.phi,I0_source=moving,I1_target=target,lowres_I0=None,variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),variables_from_optimizer=None)
 
         loss_dict = {}
         loss_dict['mermaid_sim_loss'] = mermaid_sim_loss
         loss_dict['mermaid_reg_loss'] = mermaid_reg_loss
 
+        # factors controlling the balance for mermaid sim loss and reg sim loss
         fine_factor = 1./(np.exp((self.pretrain_epochs-cur_epoch)/self.pretrain_epochs*10)+1)
         pre_factor = 1./(np.exp((cur_epoch-self.pretrain_epochs)/self.pretrain_epochs*10)+1)        
-        
+        recons_sim_loss = self.sim_criterion.compute_similarity_multiNC(self.moving_warped_recons, target)
+        loss_dict['recons_sim_loss'] = recons_sim_loss 
+        sim_loss = pre_factor*mermaid_sim_loss + fine_factor*recons_sim_loss
+        loss_dict['sim_loss'] = sim_loss
+
         if self.join_two_networks:
-            recons_loss_L1 = self.recons_criterion_L1(self.moving_warped, self.moving_warped_recons)
+            # controlling recons loss: do not backpropogate through momentum net
+            # using moving_warped_recons_det, which is obtained from detached movining warped
+            recons_loss_L1 = self.recons_criterion_L1(self.moving_warped.detach(), self.moving_warped_recons_det)
             loss_dict['recons_loss_L1'] = recons_loss_L1
             if self.recons_criterion_TV is not None:
-                recons_loss_TV = self.recons_criterion_TV(self.moving_warped, self.moving_warped_recons)
+                recons_loss_TV = self.recons_criterion_TV(self.moving_warped.detach(), self.moving_warped_recons_det)
                 loss_dict['recons_loss_TV'] = recons_loss_TV
-                recons_loss = pre_factor*recons_loss_L1 + fine_factor*recons_loss_TV
+                recons_loss = recons_loss_L1 + recons_loss_TV
             else:
                 recons_loss = recons_loss_L1
             loss_dict['recons_loss'] = recons_loss 
@@ -135,24 +150,21 @@ class PregisNet(nn.Module):
             if self.recons_criterion_TV is not None:
                 recons_loss_TV = self.recons_criterion_TV(moving, self.moving_warped_recons)
                 loss_dict['recons_loss_TV'] = recons_loss_TV
-                recons_loss = pre_factor*recons_loss_L1 + fine_factor*recons_loss_TV
+                recons_loss = recons_loss_L1 + recons_loss_TV
             else:
                 recons_loss = recons_loss_L1
             loss_dict['recons_loss'] = recons_loss 
- 
-
+             
+        # mu, logvar have been detached
         kld_element = self.mu.pow(2).add_(self.logvar.exp()).mul_(-1).add_(1).add_(self.logvar)
         kld_loss = torch.mean(kld_element).mul_(-0.5)
         loss_dict['kld_loss'] = kld_loss 
 
-        recons_sim_loss = self.sim_criterion.compute_similarity_multiNC(self.moving_warped_recons, target)
-        loss_dict['recons_sim_loss'] = recons_sim_loss 
-        sim_loss = pre_factor*mermaid_sim_loss + fine_factor*recons_sim_loss
-        loss_dict['sim_loss'] = sim_loss
-
         if mode == 'train':
+            # training loss, a combination of mermaid sim and recons sim
             all_loss = self.gamma_mermaid*(mermaid_reg_loss + sim_loss)/self.batch_size + self.gamma_recons* (0.001*kld_loss + recons_loss) 
         elif mode == 'validate':
+            # validate loss, only considering recons sim loss
             all_loss = self.gamma_mermaid*(mermaid_reg_loss + recons_sim_loss)/self.batch_size + self.gamma_recons* (0.001*kld_loss + recons_loss)
         else:
             raise ValueError("mode not recognized")
@@ -176,15 +188,18 @@ class PregisNet(nn.Module):
         if self.map_low_res_factor is not None:
             self.set_mermaid_params(moving=moving, target=target, momentum=momentum)
             lowResMoving = _compute_low_res_image(target, self.spacing, self.lowResSize)
-            maps = self.mermaid_unit(self.lowResIdentityMap, lowResMoving)
+            # TODO inverse initial map should base on moving image space, not lowResIdentityMap
+            phi, phi_inv = self.mermaid_unit(self.lowResIdentityMap, lowResMoving, self.lowResIdentityMap)
 
             desiredSz = self.identityMap.size()[2:]
             sampler = py_is.ResampleImage()
-            rec_phiWarped, _ = sampler.upsample_image_to_size(maps, self.spacing, desiredSz, spline_order=1)
+            rec_phi, _ = sampler.upsample_image_to_size(phi, self.spacing, desiredSz, spline_order=1)
+            rec_phi_inv, _ = sampler.upsample_image_to_size(phi_inv, self.spacing, desiredSz, spline_order=1)
+            
 
         if self.use_map:
-            rec_target_warped = py_utils.compute_warped_image_multiNC(moving, rec_phiWarped, self.spacing, spline_order=1)
-        return rec_target_warped, rec_phiWarped
+            moving_warped = py_utils.compute_warped_image_multiNC(moving, rec_phi, self.spacing, spline_order=1)
+        return moving_warped, rec_phi, rec_phi_inv
 
     #####################################
     #  Forward pass
@@ -192,24 +207,34 @@ class PregisNet(nn.Module):
 
     def single_forward(self, moving,target, current_epoch):
         momentum = self.momentum_net(moving, target)
-        moving_warped, phi = self.mermaid_shoot(moving, target, momentum)
+        moving_warped, phi, phi_inv = self.mermaid_shoot(moving, target, momentum)
 
         if self.join_two_networks:
-           moving_warped_recons, mu, logvar = self.recons_net(moving_warped)
-        else: # use moving image
-           moving_warped_recons, mu, logvar = self.recons_net(moving)
+            # forward vae, detached from momentum net
+            moving_warped_recons_det, mu_det, logvar_det = self.recons_net(moving_warped.detach())
+            self.moving_warped_recons_det = moving_warped_recons_det
+            self.mu = mu_det
+            self.logvar = logvar_det
 
+            # forward vae, attached to momentum net
+            moving_warped_recons, _, _ = self.recons_net(moving_warped)
+
+        else: # use moving image
+            moving_warped_recons, mu, logvar = self.recons_net(moving)
+            self.mu = mu
+            self.logvar = logvar
+ 
         self.moving_warped_recons = moving_warped_recons
         self.phi = phi
+        self.phi_inv = phi_inv
+
         self.momentum = momentum
         self.moving_warped = moving_warped
 
-        self.mu = mu
-        self.logvar = logvar
         return moving_warped.detach(), moving_warped_recons.detach(), phi.detach()
 
 
 
-    def forward(self, moving, target, current_epoch):
+    def forward(self, moving, target, current_epoch=0):
         return self.single_forward(moving, target, current_epoch)
 

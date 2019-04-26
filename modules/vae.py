@@ -29,8 +29,7 @@ class VaeNet(nn.Module):
             conv_bn_rel_dp(32, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True),
             conv_bn_rel_dp(32, 16, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu'),
             conv_bn_rel_dp(16, 8, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True),
-            conv_bn_rel_dp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
-            nn.Sigmoid()
+            conv_bn_rel_dp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True)
         )
         return
 

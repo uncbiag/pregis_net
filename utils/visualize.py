@@ -52,7 +52,7 @@ def make_image_summary(moving_image, target_image, moving_warped, moving_warped_
             target_image_slice = target_image[n,:,:,:]
             moving_warped_slice = moving_warped[n,:,:,:]
             moving_warped_recons_slice = moving_warped_recons[n,:,:,:]
-            diff_image_slice = moving_warped_slice - moving_warped_recons_slice
+            diff_image_slice = torch.abs(moving_warped_slice - moving_warped_recons_slice)
             if deform_field is not None:
                 deform_field_slice = deform_field[n,:,:,:]
                 deform_grid_slice = torch.from_numpy(
@@ -65,17 +65,17 @@ def make_image_summary(moving_image, target_image, moving_warped, moving_warped_
         elif dim == 3:
             for axis in range(1,4):
                 slice_indx = moving_image.size()[axis+1]//2
-                moving_image_slice = torch.select(moving_image[n,:,:,:,:], axis, slice_indx)
-                target_image_slice = torch.select(target_image[n,:,:,:,:], axis, slice_indx)
-                moving_warped_slice = torch.select(moving_warped[n,:,:,:,], axis, slice_indx) 
-                moving_warped_recons_slice = torch.select(moving_warped_recons[n,:,:,:,], axis, slice_indx) 
-                diff_image_slice = moving_warped_slice - moving_warped_recons_slice
+                moving_image_slice = torch.flip(torch.select(moving_image[n,:,:,:,:], axis, slice_indx), dims=[1])
+                target_image_slice = torch.flip(torch.select(target_image[n,:,:,:,:], axis, slice_indx), dims=[1])
+                moving_warped_slice = torch.flip(torch.select(moving_warped[n,:,:,:,], axis, slice_indx), dims=[1])
+                moving_warped_recons_slice = torch.flip(torch.select(moving_warped_recons[n,:,:,:,], axis, slice_indx), dims=[1])
+                diff_image_slice = torch.abs(moving_warped_slice - moving_warped_recons_slice)
                 image_slices += [moving_image_slice, target_image_slice, moving_warped_slice, moving_warped_recons_slice, diff_image_slice]
         else:
              raise ValueError("dimension not supported")
         grids['images'] = vision_utils.make_grid(image_slices, pad_value=1, nrow=5, normalize=True, range=(0,1))
         grids['images_un'] = vision_utils.make_grid(image_slices, pad_value=1, nrow=5)
-        grids['deform_grid'] = vision_utils.make_grid(deform_grid_slices, pad_value=1, nrow=1)
+        #grids['deform_grid'] = vision_utils.make_grid(deform_grid_slices, pad_value=1, nrow=1)
     return grids
 
 

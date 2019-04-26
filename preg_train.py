@@ -172,7 +172,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 
 def train_network():
-    dataset = 'pseudo_2D'
+    dataset = 'pseudo_3D'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
     is_continue = False

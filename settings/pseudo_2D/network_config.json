@@ -18,7 +18,7 @@
                 "use_TV_loss": true
             },
             "pretrain_epochs": 500,
-            "join_two_networks": false
+            "join_two_networks": true
         }
     },
     "train":{

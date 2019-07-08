@@ -16,9 +16,9 @@ class Pseudo2DDataset(Dataset):
         data_path = os.path.join(root_folder, 'pseudo_2D')
         
         if mode == 'training':
-            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[20:100]
+            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[0:80]
         elif mode == 'validation':
-            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[0:20]
+            self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[80:100]
         elif mode == 'testing':
             self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[0:100]
         else:

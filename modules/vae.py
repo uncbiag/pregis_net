@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class VaeNet(nn.Module):
-    def __init__(self, dim=3):
+    def __init__(self, dim=3, use_bn=False, use_dp=False):
         super(VaeNet, self).__init__()
         self.dim= dim
 
@@ -13,23 +13,24 @@ class VaeNet(nn.Module):
         self.conv12 = conv_bn_rel_dp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
 
         self.encoder = nn.Sequential(
-            conv_bn_rel_dp(1, 8, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=False),
-            conv_bn_rel_dp(8, 16, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=False),
+            conv_bn_rel_dp(1, 8, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn,use_dp=use_dp),
+            conv_bn_rel_dp(8, 16, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             mp(kernel_size=2, dim=dim),
-            conv_bn_rel_dp(16, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True),
-            conv_bn_rel_dp(32, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True),
+            conv_bn_rel_dp(16, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(32, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             mp(kernel_size=2, dim=dim),
-            conv_bn_rel_dp(32, 64, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True),
-            conv_bn_rel_dp(64, 64, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True),
+            conv_bn_rel_dp(32, 64, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(64, 64, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
         )
         self.decoder = nn.Sequential(
-            conv_bn_rel_dp(128, 64, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu'),
-            conv_bn_rel_dp(64, 64, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True),
-            conv_bn_rel_dp(64, 32, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu'),
-            conv_bn_rel_dp(32, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True),
-            conv_bn_rel_dp(32, 16, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu'),
+            conv_bn_rel_dp(128, 64, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(64, 64, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(64, 32, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(32, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            conv_bn_rel_dp(32, 16, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
             conv_bn_rel_dp(16, 8, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
-            conv_bn_rel_dp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True)
+            conv_bn_rel_dp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
+            nn.Sigmoid()
         )
         return
 

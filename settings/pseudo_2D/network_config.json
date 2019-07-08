@@ -3,8 +3,8 @@
         "name": "pregis_net",
         "n_of_feature": 32,
         "activation_function": "LeakyReLU",
-        "bn": false,
-        "dp": false,
+        "bn": true,
+        "dp": true,
         "dp_p": 0.2,
         "dataset": "pseudo_2D",
         "pregis_net":{
@@ -15,14 +15,15 @@
             "recons_net": {
                 "name": "VaeNet",
                 "gamma_recons": 1,
-                "use_TV_loss": true
+                "use_TV_loss": true,
+                "TV_weight": 1
             },
-            "pretrain_epochs": 500,
-            "join_two_networks": true
+            "pretrain_epochs": 1000,
+            "join_two_networks": false
         }
     },
     "train":{
-        "n_of_epochs":5000,
+        "n_of_epochs":10000,
         "batch_size":20,
         "min_summary_period":15,
         "optimizer":{
@@ -31,11 +32,11 @@
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
-                   1000,
-                   2000,
-                   4000
+                   4000,
+                   6000,
+                   8000
                 ],
-                "gamma": 0.1
+                "gamma": 0.5
             }
         }
     },

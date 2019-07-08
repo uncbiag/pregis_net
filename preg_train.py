@@ -172,7 +172,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 
 def train_network():
-    dataset = 'pseudo_3D'
+    dataset = 'pseudo_2D'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
     is_continue = False
@@ -195,6 +195,7 @@ def train_network():
     gamma_recons = network_config['model']['pregis_net']['recons_net']['gamma_recons']
     gamma_mermaid = network_config['model']['pregis_net']['momentum_net']['gamma_mermaid']
     use_TV_loss = network_config['model']['pregis_net']['recons_net']['use_TV_loss']
+    init_lr = network_config['train']['optimizer']['lr']
     join_two_networks = network_config['model']['pregis_net']['join_two_networks']
     model_path = None
     #if is_continue:
@@ -218,12 +219,13 @@ def train_network():
    
     #criterion = create_loss(train_config)
     if not is_continue:
-        my_name = "model_{}_sm{:.3f}_gm{:.3f}_gr{:.3f}_loss{}_{}".format(
+        my_name = "model_{}_sm{:.3f}_gm{:.3f}_gr{:.3f}_loss{}_lr{}_{}".format(
             my_time,
             sigma,
             gamma_mermaid,
             gamma_recons,
             "TV" if use_TV_loss else "L1",
+            init_lr,
             "Join" if join_two_networks else "NotJ")
         model_folder = os.path.join(os.path.dirname(__file__), 'tmp_models', 'vae', my_name)
         os.system('mkdir -p ' + model_folder)

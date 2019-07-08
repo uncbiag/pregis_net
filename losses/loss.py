@@ -1,6 +1,15 @@
 import torch
 import torch.nn as nn
 
+
+class GMLoss(nn.Module):
+    # Geman & McClure Loss:
+    # L(x,\sigma) = \frac{x^2}{\simga + x^2}, \sigma>0
+    # L(0,\sigma) = 0, L(\inf, \sigma) = 1
+    def __init__(self, sigma=0.01):
+        super(GMLoss, self).__init__()
+
+
 class TVLoss(nn.Module):
     def __init__(self):
         super(TVLoss,self).__init__()

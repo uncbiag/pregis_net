@@ -75,9 +75,9 @@ def create_dataloader(model_config, tr_config, va_config):
     image_io = py_fio.ImageIO()
     target_image, target_hdrc, target_spacing,_ = image_io.read_to_nc_format(atlas_file, silent_mode=True)
 
-    train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True)
-    validate_data_loader = DataLoader(my_validate_dataset, batch_size=va_config['batch_size'], shuffle=False)
-    test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False)
+    train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True, num_workers=4)
+    validate_data_loader = DataLoader(my_validate_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4)
+    test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4)
     model_config['img_sz'] = [tr_config['batch_size'], 1] + list(target_image.shape[2:])
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc

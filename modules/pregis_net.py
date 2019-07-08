@@ -38,11 +38,11 @@ class PregisNet(nn.Module):
         self.batch_size = self.img_sz[0]
         
         if self.config[model_name]['momentum_net']['name'] == "MomentumNet":
-            self.momentum_net = MomentumNet(n_ft=n_ft, dim=dim)
+            self.momentum_net = MomentumNet(dim=dim, use_bn=bn, use_dp=dp)
         else:
             raise ValueError("Not supported")
         if self.config[model_name]['recons_net']['name'] == "VaeNet":    
-            self.recons_net = VaeNet(dim=dim)
+            self.recons_net = VaeNet(dim=dim, use_bn=bn, use_dp=dp)
         else:
             raise ValueError("Not supported")
 
@@ -53,6 +53,7 @@ class PregisNet(nn.Module):
         self.recons_criterion_L1 = nn.L1Loss(reduction='mean').cuda()
         if use_TV_loss:
             self.recons_criterion_TV = loss.TVLoss().cuda()
+            self.TV_weight = self.config[model_name]['recons_net']['TV_weight']
         else:
             self.recons_criterion_TV = None 
 
@@ -135,26 +136,26 @@ class PregisNet(nn.Module):
         if self.recons_criterion_TV is not None:
             recons_loss_TV = self.recons_criterion_TV(self.moving_warped.detach(), self.moving_warped_recons_det)
             loss_dict['recons_loss_TV'] = recons_loss_TV
-            recons_loss = recons_loss_L1 + recons_loss_TV
+            recons_loss = recons_loss_L1 + self.TV_weight*recons_loss_TV
         else:
             recons_loss = recons_loss_L1
         loss_dict['recons_loss'] = recons_loss
 
 
-        # factors controlling the balance for mermaid sim loss and reg sim loss
-        fine_factor = 1./(np.exp((self.pretrain_epochs-cur_epoch)/self.pretrain_epochs*10)+1)
-        pre_factor = 1./(np.exp((cur_epoch-self.pretrain_epochs)/self.pretrain_epochs*10)+1)        
-
 
         if self.join_two_networks:
+            # factors controlling the balance for mermaid sim loss and reg sim loss
+            fine_factor = 1./(np.exp((2*self.pretrain_epochs-cur_epoch)/self.pretrain_epochs*10)+1)
+            pre_factor = 1./(np.exp((cur_epoch-2*self.pretrain_epochs)/self.pretrain_epochs*10)+1)        
+
             # using weighted similarity_loss
             recons_sim_loss = self.sim_criterion.compute_similarity_multiNC(self.moving_warped_recons, target)
             sim_loss = pre_factor*mermaid_sim_loss + fine_factor*recons_sim_loss
 
         else:
-            # using separate similarity_loss for two networks
+            # using only similarity_loss on momentum network
             recons_sim_loss = self.sim_criterion.compute_similarity_multiNC(self.moving_warped_recons_det, target)
-            sim_loss = mermaid_sim_loss + recons_sim_loss
+            sim_loss = mermaid_sim_loss 
         loss_dict['sim_loss'] = sim_loss
         
         loss_dict['recons_sim_loss'] = recons_sim_loss            
@@ -169,7 +170,7 @@ class PregisNet(nn.Module):
             all_loss = self.gamma_mermaid*(mermaid_reg_loss + sim_loss)/self.batch_size + self.gamma_recons* (0.001*kld_loss + recons_loss) 
         elif mode == 'validate':
             # validate loss, only considering recons sim loss
-            all_loss = self.gamma_mermaid*(mermaid_reg_loss + recons_sim_loss)/self.batch_size + self.gamma_recons* (0.001*kld_loss + recons_loss)
+            all_loss = self.gamma_mermaid*(mermaid_reg_loss + recons_sim_loss)/self.batch_size + self.gamma_recons*recons_loss
         else:
             raise ValueError("mode not recognized")
         loss_dict['all_loss'] = all_loss
@@ -220,6 +221,8 @@ class PregisNet(nn.Module):
         self.logvar = logvar_det
         self.moving_warped_recons_det = moving_warped_recons_det
 
+        if current_epoch+1 > self.pretrain_epochs:
+            self.join_two_networks = True
         if self.join_two_networks:
             # forward vae, attached to momentum net
             moving_warped_recons, _, _ = self.recons_net(moving_warped)

@@ -21,32 +21,24 @@ class TVLoss(nn.Module):
         img_sz = x.size()[2:]
         grad = torch.cuda.FloatTensor(batch_size, dim, *img_sz).fill_(0)
         if dim == 1:
-            #grad[:,0,1:-1] = (x[:,0,2:] - x[:,0,:-2])/2.
-            grad[:,0,:-1] = x[:,0,1:]-x[:,0,:-1]
+            grad[:, 0, :-1] = x[:, 0, 1:]-x[:, 0, :-1]
         elif dim == 2:
-            #grad[:,0,1:-1,:] = (x[:,0,2:,:] - x[:,0,:-2,:])/2.
-            #grad[:,1,:,1:-1] = (x[:,0,:,2:] - x[:,0,:,:-2])/2.
-            grad[:,0,:-1,:] = x[:,0,1:,:] - x[:,0,:-1,:]
-            grad[:,1,:,:-1] = x[:,0,:,1:] - x[:,0,:,:-1] 
+            grad[:, 0, :-1, :] = x[:, 0, 1:, :] - x[:, 0, :-1, :]
+            grad[:, 1, :, :-1] = x[:, 0, :, 1:] - x[:, 0, :, :-1]
         elif dim == 3:
-            #grad[:,0,1:-1,:,:] = (x[:,0,2:,:,:] - x[:,0,:-2,:,:])/2.
-            #grad[:,1,:,1:-1,:] = (x[:,0,:,2:,:] - x[:,0,:,:-2,:])/2.
-            #grad[:,2,:,:,1:-1] = (x[:,0,:,:,2:] - x[:,0,:,:,:-2])/2.
-            grad[:,0,:-1,:,:] = x[:,0,1:,:,:] - x[:,0,:-1,:,:]
-            grad[:,1,:,:-1,:] = x[:,0,:,1:,:] - x[:,0,:,:-1,:]
-            grad[:,2,:,:,:-1] = x[:,0,:,:,1:] - x[:,0,:,:,:-1] 
+            grad[:, 0, :-1, :, :] = x[:, 0, 1:, :, :] - x[:, 0, :-1, :, :]
+            grad[:, 1, :, :-1, :] = x[:, 0, :, 1:, :] - x[:, 0, :, :-1, :]
+            grad[:, 2, :, :, :-1] = x[:, 0, :, :, 1:] - x[:, 0, :, :, :-1]
         else:
             raise ValueError("dim error")
         grad_n = torch.norm(grad, p=2, dim=1, keepdim=True)
         return torch.mean(grad_n)
-        #return torch.sum(grad_n)
-
 
 
 if __name__ == '__main__':
-    x = torch.rand(1,1,10,10,10)
-    y = torch.rand(1,1,10,10,10)
+    x = torch.rand(1, 1, 10, 10, 10)
+    y = torch.rand(1, 1, 10, 10, 10)
     loss = TVLoss()
-    grad = loss(x,y)
+    grad = loss(x, y)
     print(torch.mean(torch.abs(x-y)))
     print(grad)

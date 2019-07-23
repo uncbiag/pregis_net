@@ -70,7 +70,8 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
             moving_image = moving_image.cuda()
             target_image = target_image.cuda()
-            moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
+            #moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
+            model(moving_image, target_image, current_epoch=current_epoch+1)
             loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch+1, mode='train')
             all_loss = loss_dict['all_loss']
             all_loss.backward()
@@ -82,25 +83,24 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                 if loss_key in loss_dict:
                     epoch_loss_dict[loss_key] += loss_dict[loss_key].item()
                 else:
-                    print("Warning: {} not exist in loss_dict. Adding zero".format(loss_key))
                     epoch_loss_dict[loss_key] += 0.0
 
             if (i+1) % summary_batch_period == 0: # print summary every k batches
-                print('====>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, m_sim_loss:{:.6f}, r_sim_loss:{:.6f}, sim_loss:{:.6f}, lr:{:.6f}'.format(
+                print('====>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, m_sim_loss:{:.6f}, lr:{:.6f}'.format(
                     current_epoch+1,
                     global_step,
                     epoch_loss_dict['all_loss']/summary_batch_period,
                     epoch_loss_dict['recons_loss']/summary_batch_period,
                     epoch_loss_dict['mermaid_sim_loss']/summary_batch_period,
-                    epoch_loss_dict['recons_sim_loss']/summary_batch_period,
-                    epoch_loss_dict['sim_loss']/summary_batch_period,
+                    #epoch_loss_dict['recons_sim_loss']/summary_batch_period,
+                    #epoch_loss_dict['sim_loss']/summary_batch_period,
                     optimizer.param_groups[0]['lr'])
                 )
 
                 for loss_key in epoch_loss_dict:
                     writer.add_scalar('training/training_{}'.format(loss_key), epoch_loss_dict[loss_key]/summary_batch_period, global_step=global_step)
 
-                image_summary = make_image_summary(moving_image, target_image, moving_warped, moving_warped_recons, phi)
+                image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(), model.phi.detach())
                 for key, value in image_summary.items():
                     writer.add_image("training_" + key, value, global_step=global_step)
                 epoch_loss_dict = {
@@ -134,23 +134,21 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                 for j, (moving_image, target_image) in enumerate(validate_data_loader, 0):
                     moving_image = moving_image.cuda()
                     target_image = target_image.cuda()
-                    moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
-                    
+                    #moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
+                    model(moving_image, target_image, current_epoch=current_epoch+1)
                     loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch+1, mode='validate')
                     for loss_key in eval_loss_dict:
                         if loss_key in loss_dict:
                             eval_loss_dict[loss_key] += loss_dict[loss_key].item()
                         else:
-                            print("Warning: {} not exist in loss_dict. Adding zero".format(loss_key))
                             eval_loss_dict[loss_key] += 0.0
 
-
-                print('=EVAL>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, sim_loss:{:.6f}'.format(
+                print('=EVAL>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, mermaid_sim_loss:{:.6f}'.format(
                     current_epoch+1,
                     global_step,
                     eval_loss_dict['all_loss']/val_iters_per_epoch,
                     eval_loss_dict['recons_loss']/val_iters_per_epoch,
-                    eval_loss_dict['sim_loss']/val_iters_per_epoch)
+                    eval_loss_dict['mermaid_sim_loss']/val_iters_per_epoch)
                 )
                 for loss_key in eval_loss_dict:
                     writer.add_scalar('validation/validation_{}'.format(loss_key), eval_loss_dict[loss_key]/val_iters_per_epoch, global_step=global_step)
@@ -165,7 +163,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                     torch.save({'epoch': current_epoch,
                                 'model_state_dict': model.state_dict(),
                                 'optimizer_state_dict': optimizer.state_dict()},save_file)
-                    image_summary = make_image_summary(moving_image, target_image, moving_warped, moving_warped_recons, phi)
+                    image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(), model.phi.detach())
                     for key, value in image_summary.items():
                         writer.add_image("validation_" + key, value, global_step=global_step)
         current_epoch = current_epoch+1

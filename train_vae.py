@@ -1,11 +1,7 @@
 from __future__ import print_function
-
-import sys
-import os
-import torch
-
 import torch.backends.cudnn as cudnn
-cudnn.benchmark = True 
+
+cudnn.benchmark = True
 
 import datetime
 from tensorboardX import SummaryWriter
@@ -20,11 +16,11 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
     n_epochs = network_config['train']['n_of_epochs']
     current_epoch = 0
     batch_size = network_config['train']['batch_size']
-    iters_per_epoch = len(train_data_loader.dataset)//batch_size
-    val_iters_per_epoch = len(validate_data_loader.dataset)//batch_size
+    iters_per_epoch = len(train_data_loader.dataset) // batch_size
+    val_iters_per_epoch = len(validate_data_loader.dataset) // batch_size
     summary_batch_period = min(network_config['train']['min_summary_period'], iters_per_epoch)
     validate_epoch_period = network_config['validate']['validate_epoch_period']
-   
+
     print('batch_size:', str(batch_size))
     print('iters_per_epoch:', str(iters_per_epoch))
     print('val_iters_per_epoch:', str(val_iters_per_epoch))
@@ -60,18 +56,18 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
             'recons_loss_TV': 0.0,
             'recons_loss': 0.0
         }
-        
-        scheduler.step(epoch=current_epoch+1)
-        for i, (moving_image,target_image) in enumerate(train_data_loader, 0):
+
+        scheduler.step(epoch=current_epoch + 1)
+        for i, (moving_image, target_image) in enumerate(train_data_loader, 0):
             model.train()
             optimizer.zero_grad()
-            global_step = current_epoch * iters_per_epoch + (i+1) 
+            global_step = current_epoch * iters_per_epoch + (i + 1)
 
             moving_image = moving_image.cuda()
             target_image = target_image.cuda()
-            #moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
-            model(moving_image, target_image, current_epoch=current_epoch+1)
-            loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch+1, mode='train')
+            # moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
+            model(moving_image, target_image, current_epoch=current_epoch + 1)
+            loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch + 1, mode='train')
             all_loss = loss_dict['all_loss']
             all_loss.backward()
 
@@ -84,22 +80,24 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                 else:
                     epoch_loss_dict[loss_key] += 0.0
 
-            if (i+1) % summary_batch_period == 0: # print summary every k batches
+            if (i + 1) % summary_batch_period == 0:  # print summary every k batches
                 print('====>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, m_sim_loss:{:.6f}, lr:{:.6f}'.format(
-                    current_epoch+1,
+                    current_epoch + 1,
                     global_step,
-                    epoch_loss_dict['all_loss']/summary_batch_period,
-                    epoch_loss_dict['recons_loss']/summary_batch_period,
-                    epoch_loss_dict['mermaid_sim_loss']/summary_batch_period,
-                    #epoch_loss_dict['recons_sim_loss']/summary_batch_period,
-                    #epoch_loss_dict['sim_loss']/summary_batch_period,
+                    epoch_loss_dict['all_loss'] / summary_batch_period,
+                    epoch_loss_dict['recons_loss'] / summary_batch_period,
+                    epoch_loss_dict['mermaid_sim_loss'] / summary_batch_period,
+                    # epoch_loss_dict['recons_sim_loss']/summary_batch_period,
+                    # epoch_loss_dict['sim_loss']/summary_batch_period,
                     optimizer.param_groups[0]['lr'])
                 )
 
                 for loss_key in epoch_loss_dict:
-                    writer.add_scalar('training/training_{}'.format(loss_key), epoch_loss_dict[loss_key]/summary_batch_period, global_step=global_step)
+                    writer.add_scalar('training/training_{}'.format(loss_key),
+                                      epoch_loss_dict[loss_key] / summary_batch_period, global_step=global_step)
 
-                image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(), model.phi.detach())
+                image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(),
+                                                   model.phi.detach())
                 for key, value in image_summary.items():
                     writer.add_image("training_" + key, value, global_step=global_step)
                 epoch_loss_dict = {
@@ -114,9 +112,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                     'recons_loss': 0.0
                 }
 
-
-
-        if current_epoch % validate_epoch_period == 0: #validate every k epochs
+        if current_epoch % validate_epoch_period == 0:  # validate every k epochs
             with torch.no_grad():
                 model.eval()
                 eval_loss_dict = {
@@ -133,9 +129,10 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                 for j, (moving_image, target_image) in enumerate(validate_data_loader, 0):
                     moving_image = moving_image.cuda()
                     target_image = target_image.cuda()
-                    #moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
-                    model(moving_image, target_image, current_epoch=current_epoch+1)
-                    loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch+1, mode='validate')
+                    # moving_warped, moving_warped_recons, phi = model(moving_image, target_image, current_epoch=current_epoch+1)
+                    model(moving_image, target_image, current_epoch=current_epoch + 1)
+                    loss_dict = model.cal_pregis_loss(moving_image, target_image, cur_epoch=current_epoch + 1,
+                                                      mode='validate')
                     for loss_key in eval_loss_dict:
                         if loss_key in loss_dict:
                             eval_loss_dict[loss_key] += loss_dict[loss_key].item()
@@ -143,15 +140,15 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                             eval_loss_dict[loss_key] += 0.0
 
                 print('=EVAL>{:0d}, {:0d}, loss:{:.6f}, rec_loss:{:.6f}, mermaid_sim_loss:{:.6f}'.format(
-                    current_epoch+1,
+                    current_epoch + 1,
                     global_step,
-                    eval_loss_dict['all_loss']/val_iters_per_epoch,
-                    eval_loss_dict['recons_loss']/val_iters_per_epoch,
-                    eval_loss_dict['mermaid_sim_loss']/val_iters_per_epoch)
+                    eval_loss_dict['all_loss'] / val_iters_per_epoch,
+                    eval_loss_dict['recons_loss'] / val_iters_per_epoch,
+                    eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch)
                 )
                 for loss_key in eval_loss_dict:
-                    writer.add_scalar('validation/validation_{}'.format(loss_key), eval_loss_dict[loss_key]/val_iters_per_epoch, global_step=global_step)
-
+                    writer.add_scalar('validation/validation_{}'.format(loss_key),
+                                      eval_loss_dict[loss_key] / val_iters_per_epoch, global_step=global_step)
 
                 if min_val_loss == 0.0 and global_step >= 50:
                     min_val_loss = eval_loss_dict['all_loss']
@@ -161,17 +158,19 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                     print("Writing current best eval model")
                     torch.save({'epoch': current_epoch,
                                 'model_state_dict': model.state_dict(),
-                                'optimizer_state_dict': optimizer.state_dict()},save_file)
-                    image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(), model.phi.detach())
+                                'optimizer_state_dict': optimizer.state_dict()}, save_file)
+                    image_summary = make_image_summary(moving_image, target_image, model.w1.detach(), model.r1.detach(),
+                                                       model.phi.detach())
                     for key, value in image_summary.items():
                         writer.add_image("validation_" + key, value, global_step=global_step)
-        current_epoch = current_epoch+1
+        current_epoch = current_epoch + 1
 
 
 def train_network():
     dataset = 'pseudo_3D'
     now = datetime.datetime.now()
-    my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+    my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
+                                                             now.second)
     is_continue = False
     model_folder = None
 
@@ -183,7 +182,7 @@ def train_network():
         mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
     else:
         network_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/network_config.json".format(dataset))
-        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config.json'.format(dataset))
+        mermaid_config_file = os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config.json'.format(dataset))
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
     with open(network_config_file) as f:
@@ -200,13 +199,13 @@ def train_network():
     model_config = network_config['model']
     train_config = network_config['train']
     validate_config = network_config['validate']
-    
+
     train_data_loader, validate_data_loader, _ = create_dataloader(model_config, train_config, validate_config)
     model_config['mermaid_config_file'] = mermaid_config_file
     model = create_model(model_config)
     optimizer, scheduler = create_optimizer(train_config, model)
-   
-    #criterion = create_loss(train_config)
+
+    # criterion = create_loss(train_config)
     if not is_continue:
         my_name = "model_{}_sm{:.3f}_gm{:.3f}_gr{:.3f}_loss{}_lr{}_{}".format(
             my_time,
@@ -223,10 +222,11 @@ def train_network():
         log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
         os.system('mkdir -p ' + log_folder)
 
-
-    train_model(model, train_data_loader, validate_data_loader, optimizer, scheduler, network_config, my_name, model_folder, model_path=model_path)
+    train_model(model, train_data_loader, validate_data_loader, optimizer, scheduler, network_config, my_name,
+                model_folder, model_path=model_path)
 
     return
 
+
 if __name__ == '__main__':
-    train_network()
+    train_vae()

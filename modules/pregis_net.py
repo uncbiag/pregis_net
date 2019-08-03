@@ -13,7 +13,7 @@ import pyreg.similarity_measure_factory as smf
 
 import losses.loss as loss
 from modules.vae import VaeNet
-from modules.momentum_net import MomentumNet
+from modules.u_net import UNet
 
 
 class PregisNet(nn.Module):
@@ -197,7 +197,7 @@ class PregisNet(nn.Module):
     def mermaid_shoot(self, moving, target, momentum): # target to recons
         if self.map_low_res_factor is not None:
             self.set_mermaid_params(moving=moving, target=target, momentum=momentum)
-            lowResMoving = _compute_low_res_image(target, self.spacing, self.lowResSize)
+            lowResMoving = _compute_low_res_image(moving, self.spacing, self.lowResSize)
 
             # TODO inverse initial map should base on moving image space, not lowResIdentityMap
             phi, phi_inv = self.mermaid_unit(self.lowResIdentityMap, lowResMoving, self.lowResIdentityMap)

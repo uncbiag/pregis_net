@@ -6,8 +6,18 @@ from utils.utils import *
 
 
 class Pseudo3DDataset(Dataset):
-    def __init__ (self, mode='training'):
+    def __init__ (self, mode='training', network='pregis'):
+        self.network = network
         root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net'
+        self.oasis_brain = os.path.join(root_folder, 'oasis_affined/brains')
+        self.oasis_label = os.path.join(root_folder, 'oasis_affined/labels')
+
+
+
+
+
+
+
         data_path = os.path.join(root_folder, 'pseudo_3D', 'tumor')  
         image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))
         num_of_all_files = len(image_files)
@@ -29,6 +39,11 @@ class Pseudo3DDataset(Dataset):
     def __getitem__(self, idx):
         image_file = self.image_files[idx]
         image_io = py_fio.ImageIO()
+
+        oasis_name = image_file.split('_to_')[0]
+        brats_name = image_file.split('_to_')[1]
+
+
         image, _, _, _ = image_io.read_to_nc_format(image_file, silent_mode=True)
         atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
         return image[0,...], atlas[0,...]

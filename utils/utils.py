@@ -8,12 +8,7 @@ import torch.nn.functional as F
 import sys 
 import os
 
-
-
 sys.path.append(os.path.join(os.path.dirname(__file__), '../mermaid'))
-#sys.path.append(os.path.join(mermaid_path, 'pyreg'))
-#sys.path.append(os.path.join(mermaid_path, 'pyreg/libraries'))
-#sys.path.append('./modules')
 import pyreg.fileio as py_fio
 
 from modules.pregis_net import PregisNet
@@ -29,7 +24,6 @@ from data_loaders import brats_3D as brats_3D_dataset
 def collate_fn_cbctdataset(batch):
     
     moving_image, moving_label, target_image, target_label, momentum, target_spacing = zip(*batch)
-
     m_image = torch.from_numpy(moving_image[0])
     m_label = torch.from_numpy(moving_label[0])
     t_image = torch.from_numpy(target_image[0])

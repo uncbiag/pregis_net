@@ -2,9 +2,9 @@ from modules.layers import *
 import torch
 import torch.nn as nn
 
-class MomentumNet(nn.Module):
+class UNet(nn.Module):
     def __init__(self, dim=3, use_bn=False, use_dp=False, map_factor=0.5):
-        super(MomentumNet, self).__init__()
+        super(UNet, self).__init__()
         assert(map_factor == 0.5)
         self.in11 = conv_bn_rel_dp(1,8, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp)
         self.in12 = conv_bn_rel_dp(1,8, kernel_size=3,stride=1, dim=dim, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp)

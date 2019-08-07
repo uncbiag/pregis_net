@@ -63,7 +63,7 @@ def create_dataloader(model_config, tr_config, va_config):
     else:
         raise ValueError("dataset not available")
 
-    my_train_dataset = MyDataset(mode='training', batch_size=tr_config['batch_size'])
+    my_train_dataset = MyDataset(mode='training')
     my_validate_dataset = MyDataset(mode='validation')
     my_test_dataset = MyDataset(mode='testing')
     atlas_file = my_train_dataset.atlas_file

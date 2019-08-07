@@ -34,15 +34,31 @@ class Pseudo3DDataset(Dataset):
 
         self.mode = mode
         num_of_all_files = len(image_files)
-        num = num_of_all_files // 20
-        if mode == 'training':
-            self.image_files = image_files[6*num:20*num]
-        elif mode == 'validation':
-            self.image_files = image_files[3*num:6*num]
-        elif mode == 'testing':
-            self.image_files = image_files[0:3*num]
+        num = num_of_all_files // 40
+
+        # split the data for normal training and abnormal training, so that they don't overlap for sanity.
+        if type == 'normal':
+            if mode == 'training':
+                self.image_files = image_files[6*num:20*num]
+            elif mode == 'validation':
+                self.image_files = image_files[3*num:6*num]
+            elif mode == 'testing':
+                self.image_files = image_files[0:3*num]
+            else:
+                raise ValueError('Mode not supported')
+        elif type == 'no_tumor' or type == 'tumor':
+            if mode == 'training':
+                self.image_files = image_files[26*num:40*num]
+            elif mode == 'validation':
+                self.image_files = image_files[23*num:26*num]
+            elif mode == 'testing':
+                self.image_files = image_files[20:23*num]
+            else:
+                raise ValueError('Mode not supported')
+
         else:
-            raise ValueError('Mode not supported')
+            raise ValueError("Type not supported")
+
         self.atlas_file = atlas_file
         self.image_io = py_fio.ImageIO()
         self.atlas, _, _, _ = self.image_io.read_to_nc_format(self.atlas_file, silent_mode=True)

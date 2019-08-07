@@ -61,7 +61,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
             all_loss = loss_dict['mermaid_all_loss']
             all_loss.backward()
 
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+            #torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
             optimizer.step()
 
             for loss_key in epoch_loss_dict:

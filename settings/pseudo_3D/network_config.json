@@ -14,19 +14,17 @@
             "recons_net": {
                 "name": "VaeNet",
                 "gamma_recons": 1,
-                "use_TV_loss": true
-            },
-            "pretrain_epochs": 50,
-            "join_two_networks": false
+                "use_TV_loss": false
+            }
         }
     },
     "train":{
-        "n_of_epochs":500,
-        "batch_size":1,
+        "n_of_epochs":200,
+        "batch_size":2,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.0005,
+            "lr": 0.0001,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
@@ -40,8 +38,7 @@
     },
     "validate":{
         "batch_size":1,
-        "validate_epoch_period":5,
-        "validate_interval": 20
+        "validate_epoch_period":1
     },
     "test":{
     }

@@ -1,0 +1,13 @@
+# pip requirements file
+numpy
+scipy
+matplotlib
+torchvision
+cffi
+future
+itk
+sphinx
+pynrrd
+progressbar
+pandas
+openpyxl

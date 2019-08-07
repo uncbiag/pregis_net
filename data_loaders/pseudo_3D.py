@@ -49,7 +49,6 @@ class Pseudo3DDataset(Dataset):
 
 
     def __len__(self):
-        print(len(self.image_files))
         return len(self.image_files)
 
     def __getitem__(self, idx):

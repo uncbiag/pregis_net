@@ -34,13 +34,13 @@ class Pseudo3DDataset(Dataset):
 
         self.mode = mode
         num_of_all_files = len(image_files)
-        num = num_of_all_files // 5
+        num = num_of_all_files // 20
         if mode == 'training':
-            self.image_files = image_files[2*num:5*num]
+            self.image_files = image_files[6*num:20*num]
         elif mode == 'validation':
-            self.image_files = image_files[1*num:2*num]
+            self.image_files = image_files[3*num:6*num]
         elif mode == 'testing':
-            self.image_files = image_files[0:1*num]
+            self.image_files = image_files[0:3*num]
         else:
             raise ValueError('Mode not supported')
         self.atlas_file = atlas_file
@@ -49,6 +49,7 @@ class Pseudo3DDataset(Dataset):
 
 
     def __len__(self):
+        print(len(self.image_files))
         return len(self.image_files)
 
     def __getitem__(self, idx):

@@ -204,10 +204,11 @@ def train_network():
 
     # criterion = create_loss(train_config)
     if not is_continue:
-        my_name = "model_{}_sigma{:.3f}_lr{}".format(
+        my_name = "model_{}_sigma{:.3f}_lr{}_{}".format(
             my_time,
             sigma,
-            init_lr)
+            init_lr,
+            sim)
         model_folder = os.path.join(os.path.dirname(__file__), 'tmp_models', 'mermaid_net', my_name)
         os.system('mkdir -p ' + model_folder)
         os.system('cp ' + network_config_file + ' ' + model_folder)

@@ -18,11 +18,10 @@ import pyreg.module_parameters as pars
 from pyreg.data_wrapper import AdaptVal
 
 
-def evaluate_momentum(moving_image, target_image, target_spacing, momentum, islabel=False):
+def evaluate_momentum(moving_image, target_image, target_spacing, momentum, registration_param_file, islabel=False):
     shared_parameters=dict()
     params=pars.ParameterDict()
     print(sys.path[0])
-    registration_param_file=os.path.join(os.path.dirname(__file__), '../settings/mermaid_config.json')
     print(registration_param_file)
     params.load_JSON(registration_param_file)
 
@@ -46,7 +45,7 @@ def evaluate_momentum(moving_image, target_image, target_spacing, momentum, isla
 
 
 
-def image_pair_registration(moving_images_w_masks, target_images_w_masks, target_image_spacing, map_resolution, result_folder):
+def image_pair_registration(moving_images_w_masks, target_images_w_masks, target_image_spacing, map_resolution, result_folder, registration_param_file):
     """
     :param moving_image_paths: path for moving image
     :param target_image_paths: path for target image
@@ -60,8 +59,8 @@ def image_pair_registration(moving_images_w_masks, target_images_w_masks, target
                        model_name='svf_vector_momentum_map',
                        use_multi_scale=False,
                        use_batch_optimization=False,
-                       json_config_out_filename=os.path.join(result_folder, 'mermaid_config.json'),
-                       params=os.path.join(os.path.dirname(__file__), '../settings/mermaid_config.json'),
+                       json_config_out_filename=os.path.join(result_folder, 'mermaid_config_lncc.json'),
+                       params=registration_param_file,
                        map_low_res_factor=map_resolution)
 
     warped_images_w_masks = si.get_warped_image()

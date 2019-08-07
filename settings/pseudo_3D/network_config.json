@@ -19,18 +19,18 @@
         }
     },
     "train":{
-        "n_of_epochs":200,
+        "n_of_epochs":100,
         "batch_size":2,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.0001,
+            "lr": 0.0005,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
-                   100,
-                   300,
-                   500
+                   25,
+                   50,
+                   75
                 ],
                 "gamma": 0.1
             }

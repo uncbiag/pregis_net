@@ -15,7 +15,7 @@ import pyreg.fileio as py_fio
 
 params = pars.ParameterDict()
 test_data = '/playpen/xhs400/Research/data/data_for_pregis_net/atlas_folder/atlas.nii.gz'
-params.load_JSON('/playpen/xhs400/Research/PycharmProjects/pregis_net/main/settings/mermaid_config.json')
+params.load_JSON('/playpen/xhs400/Research/PycharmProjects/pregis_net/main/settings/mermaid_config_lncc.json')
 image_io = py_fio.ImageIO()
 I, hdr, spacing, _ = image_io.read_batch_to_nc_format(test_data)
 lncc = py_smf.CustLNCCSimilarity(spacing, params['model']['registration_model'])

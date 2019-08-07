@@ -2,6 +2,7 @@ import os
 import datetime
 import json
 from utils.utils import *
+import glob
 
 from tensorboardX import SummaryWriter
 from utils.visualize import make_image_summary
@@ -160,6 +161,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 def train_network():
     dataset = 'pseudo_3D'
+    sim = 'ncc'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
                                                              now.second)
@@ -171,10 +173,11 @@ def train_network():
         my_name = model_folder.split('/')[-1]
     if model_folder is not None:
         network_config_file = os.path.join(model_folder, 'network_config.json')
-        mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
+        for file in glob.glob(os.path.join(model_folder, 'mermaid_config_*.json')):
+            mermaid_config_file = file
     else:
         network_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/network_config.json".format(dataset))
-        mermaid_config_file = os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config.json'.format(dataset))
+        mermaid_config_file = os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config_' + sim + ' .json'.format(dataset))
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
     with open(network_config_file) as f:

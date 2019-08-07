@@ -17,6 +17,7 @@ from torch.autograd import Variable
 import torchvision.utils as utils
 import json
 from utils.utils import *
+import glob
 
 
 def test_model(model, test_data_loader, network_config, my_model_folder):
@@ -53,7 +54,8 @@ def test_model(model, test_data_loader, network_config, my_model_folder):
 def test_network():
     model_folder = "tmp_models/vae/model_20190426-014309_sm1.000_gm1.000_gr1.000_lossTV_Join" 
     model_path = os.path.join(model_folder, 'best_eval.pth.tar')
-    mermaid_config_file = os.path.join(model_folder, 'mermaid_config.json')
+    for file in glob.glob(os.path.join(model_folder, 'mermaid_config_*.json')):
+        mermaid_config_file = file
     network_config_file = os.path.join(model_folder, 'network_config.json')
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)

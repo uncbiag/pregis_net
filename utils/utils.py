@@ -63,7 +63,7 @@ def create_dataloader(model_config, tr_config, va_config):
     else:
         raise ValueError("dataset not available")
 
-    my_train_dataset = MyDataset(mode='training')
+    my_train_dataset = MyDataset(mode='training', batch_size=tr_config['batch_size'])
     my_validate_dataset = MyDataset(mode='validation')
     my_test_dataset = MyDataset(mode='testing')
     atlas_file = my_train_dataset.atlas_file
@@ -71,14 +71,14 @@ def create_dataloader(model_config, tr_config, va_config):
     image_io = py_fio.ImageIO()
     target_image, target_hdrc, target_spacing,_ = image_io.read_to_nc_format(atlas_file, silent_mode=True)
 
-    train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True, num_workers=4)
-    validate_data_loader = DataLoader(my_validate_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4)
-    test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4)
+    train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True, num_workers=4, drop_last=True)
+    validate_data_loader = DataLoader(my_validate_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4, drop_last=True)
+    #test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4, drop_last=True)
     model_config['img_sz'] = [tr_config['batch_size'], 1] + list(target_image.shape[2:])
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc
     model_config['target_spacing'] = target_spacing
-    return train_data_loader, validate_data_loader, test_data_loader
+    return train_data_loader, validate_data_loader
 
 def create_optimizer(config, model):
     method = config['optimizer']['name']

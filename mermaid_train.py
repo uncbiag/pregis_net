@@ -197,7 +197,7 @@ def train_network():
     train_config = network_config['train']
     validate_config = network_config['validate']
 
-    train_data_loader, validate_data_loader, _ = create_dataloader(model_config, train_config, validate_config)
+    train_data_loader, validate_data_loader = create_dataloader(model_config, train_config, validate_config)
     model_config['mermaid_config_file'] = mermaid_config_file
     model = create_model(model_config, model_name='mermaid_net')
     optimizer, scheduler = create_optimizer(train_config, model)

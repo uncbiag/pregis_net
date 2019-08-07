@@ -63,15 +63,21 @@ class Pseudo3DDataset(Dataset):
         self.atlas_file = atlas_file
         self.image_io = py_fio.ImageIO()
         self.atlas, _, _, _ = self.image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
+        for i in range(len(self.image_files)):
+            image, _, _, _ = self.image_io.read_to_nc_format(self.image_files[i], silent_mode=True)
+            print("Image {}: {} is loaded".format(i+1, self.image_files[i]))
+            if i == 0:
+                self.images = image
+            else:
+                self.images = np.concatenate((self.images, image), axis=0)
+        print(self.images.shape)
 
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        image_file = self.image_files[idx]
-        image, _, _, _ = self.image_io.read_to_nc_format(image_file, silent_mode=True)
-        return image[0,...], self.atlas[0,...]
+        return self.images[idx,...], self.atlas[idx,...]
 
 
 

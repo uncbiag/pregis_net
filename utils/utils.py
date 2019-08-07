@@ -65,7 +65,6 @@ def create_dataloader(model_config, tr_config, va_config):
 
     my_train_dataset = MyDataset(mode='training')
     my_validate_dataset = MyDataset(mode='validation')
-    my_test_dataset = MyDataset(mode='testing')
     atlas_file = my_train_dataset.atlas_file
     print(atlas_file)
     image_io = py_fio.ImageIO()

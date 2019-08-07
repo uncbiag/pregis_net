@@ -5,5 +5,4 @@ __pycache__
 logs
 new-logs
 tmp_models
-mermaid
 *.swp

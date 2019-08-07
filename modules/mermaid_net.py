@@ -16,7 +16,7 @@ from modules.u_net import UNet
 
 class MermaidNet(nn.Module):
     def __init__(self, model_config):
-        super(MermaidNet).__init__()
+        super(MermaidNet, self).__init__()
         self.config = model_config
 
         bn = self.config['bn']
@@ -53,7 +53,7 @@ class MermaidNet(nn.Module):
                 mf = py_mf.ModelFactory(self.img_sz, self.spacing, self.lowResSize, self.lowResSpacing)
         else:
             raise ValueError("map_low_res_factor not defined")
-        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=True)
+        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=False)
 
 
         ## Currently Must use map
@@ -80,7 +80,7 @@ class MermaidNet(nn.Module):
                                                                                       I0_source=moving,
                                                                                       I1_target=target,
                                                                                       lowres_I0=None,
-                                                                                      variables_from_forward_model=self.mermaid_unit.get_variables_to_transfoer_to_loss_function(),
+                                                                                      variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
                                                                                       variables_from_optimizer=None)
 
         loss_dict['mermaid_all_loss'] = mermaid_all_loss
@@ -88,11 +88,18 @@ class MermaidNet(nn.Module):
         loss_dict['mermaid_reg_loss'] = mermaid_reg_loss
         return loss_dict
 
+    def set_mermaid_params(self, moving, target, momentum):
+        self.mermaid_unit.set_dictionary_to_pass_to_integrator({'I0': moving, 'I1': target})
+        self.mermaid_criterion.set_dictionary_to_pass_to_smoother({'I0': moving, 'I1': target})
+        self.mermaid_unit.m = momentum
+        self.mermaid_criterion.m = momentum
+        return
+
 
     def mermaid_shoot(self, moving, target, momentum):
         self.set_mermaid_params(moving=moving, target=target, momentum=momentum)
-        lowResMoving = _compute_low_res_image(moving, self.spacing, self.lowResSize)
-        lowResPhi, _ = self.mermaid_unit(self.lowResIdentityMap, lowResMoving)
+        lowResMoving = _compute_low_res_image(target, self.spacing, self.lowResSize)
+        lowResPhi = self.mermaid_unit(self.lowResIdentityMap, lowResMoving)
         desiredSz = self.identityMap.size()[2:]
         phi, _ = self.sampler.upsample_image_to_size(lowResPhi, self.spacing, desiredSz, spline_order=1)
         moving_warped = py_utils.compute_warped_image_multiNC(moving, phi, self.spacing, spline_order=1)
@@ -102,11 +109,9 @@ class MermaidNet(nn.Module):
     def single_forward(self, moving, target):
         momentum = self.u_net(moving, target) # get momentum
         warped, phi = self.mermaid_shoot(moving, target, momentum)
-
         self.warped = warped
         self.phi = phi
         return
-
 
 
     def forward(self, moving, target):

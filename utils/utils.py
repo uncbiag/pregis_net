@@ -12,6 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '../mermaid'))
 import pyreg.fileio as py_fio
 
 from modules.pregis_net import PregisNet
+from modules.mermaid_net import MermaidNet
 from torch.utils.data import DataLoader, Dataset
 
 from data_loaders import pseudo_2D as pseudo_2D_dataset
@@ -39,10 +40,11 @@ def weights_init(m):
         nn.init.constant_(m.bias.data,0)
 
 
-def create_model(network_config):
-    name = network_config['name']
-    if name == 'pregis_net':
+def create_model(network_config, model_name):
+    if model_name == 'pregis_net':
         model = PregisNet(network_config)
+    elif model_name == 'mermaid_net':
+        model = MermaidNet(network_config)
     else:
         raise ValueError("Model Not supported")
     model.cuda()

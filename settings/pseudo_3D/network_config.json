@@ -1,6 +1,5 @@
 {
     "model":{
-        "name": "pregis_net",
         "n_of_feature": 32,
         "activation_function": "LeakyReLU",
         "bn": false,
@@ -8,8 +7,8 @@
         "dp_p": 0.2,
         "dataset": "pseudo_3D",
         "pregis_net":{
-            "momentum_net": {
-                "name": "MomentumNet",
+            "mermaid_net": {
+                "name": "MermaidNet",
                 "gamma_mermaid": 1
             },
             "recons_net": {

@@ -17,28 +17,73 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None):
             background_image = background_image.cpu().numpy()
         assert background_image.shape[1:] == transform.shape[1:]
 
-    dim = len(background_image.shape[1:])
-    if dim == 2:
-        left_axis = [0, 1]
-        fig = plt.figure(figsize=np.array(transform.shape[1:])/5, dpi=10)
-        ax = fig.add_axes([0,0,1,1])
-        ax.set_axis_off()
-        ax.axis('equal')
-        xx = np.arange(0, transform.shape[1])
-        yy = np.arange(0, transform.shape[2])
-        if background_image is not None:
-            ax.imshow(background_image.squeeze(), vmin=0, vmax=1, cmap='gray')
-        for i, axis in enumerate(left_axis):
-            T_slice = transform[axis, :, :]
-            ax.contour(T_slice, colors=['red'], linewidths=10.0, linestyles='solid', levels=np.linspace(-1,1,40))
-        canvas = FigureCanvas(fig)
-        canvas.draw()
-        width, height = fig.get_size_inches() * fig.get_dpi()
-        image = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(int(height), int(width),3)/255
+    left_axis = [0,1,2]
+    left_axis.remove(slice_axis)
+
+    fig = plt.figure(figsize=np.array(transform.shape[1:])/5, dpi=10)
+    ax = fig.add_axes([0,0,1,1])
+    ax.set_axis_off()
+    ax.axis('equal')
+    if background_image is not None:
+        ax.imshow(background_image.squeeze(), vmin=0, vmax=1, cmap='gray')
+    for i, axis in enumerate(left_axis):
+        T_slice = transform[axis, :, :]
+        ax.contour(T_slice, colors=['red'], linewidths=10.0, linestyles='solid', levels=np.linspace(-1,1,40))
+    canvas = FigureCanvas(fig)
+    canvas.draw()
+    width, height = fig.get_size_inches() * fig.get_dpi()
+    image = np.fromstring(canvas.tostring_rgb(), dtype='uint8').reshape(int(height), int(width),3)/255
+
     return np.transpose(image, [2,0,1])
 
+def make_image_summary(images_to_show, phis_to_show, n_samples=1):
+    n_samples = min(n_samples, images_to_show[0].size()[0])
+    dim = len(images_to_show[0].shape) - 2
 
-def make_image_summary(moving_image, target_image, moving_warped, moving_warped_recons, deform_field=None , n_samples=1):
+    image_slices_to_show = []
+    grid_slices_to_show = []
+    grids = {}
+    for n in range(n_samples):
+        if dim == 2:
+            image_slices = []
+            for image in images_to_show:
+                image_slice = image[n, :, :, :]
+                image_slices.append(image_slice)
+            image_slices_to_show += image_slices
+            grid_slices = []
+            for phi in phis_to_show:
+                phi_slice = phi[n, :, :, :]
+                grid_slice = torch.from_numpy(
+                    generate_deform_grid(phi_slice, background_image=image_slices[2])
+                )
+                grid_slices.append(grid_slice)
+            grid_slices_to_show += grid_slices
+
+        elif dim == 3:
+            for axis in range(1,4):
+                slice_idx = images_to_show[0].size()[axis+1]//2
+                image_slices = []
+                grid_slices = []
+                for image in images_to_show:
+                    image_slice = torch.flip(torch.select(image[n, :, :, :, :], axis, slice_idx), dims=[1])
+                    image_slices.append(image_slice)
+                for phi in phis_to_show:
+                    phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
+                    grid_slice = torch.from_numpy(
+                        generate_deform_grid(phi_slice, axis-1, image_slices[2])
+                    )
+                    grid_slices.append(grid_slice)
+                image_slices_to_show += image_slices
+                grid_slices_to_show += grid_slices
+        else:
+            raise ValueError("dimension not supported")
+
+        grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(images_to_show), normalize=True, range=(0,1))
+        grids['grid'] = vision_utils.make_grid(grid_slices_to_show, pad_value=1, nrow=dim)
+    return grids
+
+
+def make_image_summary_old(moving_image, target_image, moving_warped, moving_warped_recons, deform_field=None , n_samples=1):
     n_samples = min(n_samples, moving_image.size()[0])
     grids = {}
     dim = len(moving_image.shape)-2
@@ -119,5 +164,5 @@ def test_generate_deform_grid():
 
 
 
-#if __name__ == '__main__':
-    #test_generate_deform_grid()
+if __name__ == '__main__':
+    test_generate_deform_grid()

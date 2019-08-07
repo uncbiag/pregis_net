@@ -161,7 +161,6 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 def train_network():
     dataset = 'pseudo_3D'
-    sim = 'ncc'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute,
                                                              now.second)
@@ -173,15 +172,21 @@ def train_network():
         my_name = model_folder.split('/')[-1]
     if model_folder is not None:
         network_config_file = os.path.join(model_folder, 'network_config.json')
-        for file in glob.glob(os.path.join(model_folder, 'mermaid_config_*.json')):
-            mermaid_config_file = file
     else:
         network_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/network_config.json".format(dataset))
-        mermaid_config_file = os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config_' + sim + ' .json'.format(dataset))
-    with open(mermaid_config_file) as f:
-        mermaid_config = json.load(f)
+
     with open(network_config_file) as f:
         network_config = json.load(f)
+
+    sim = network_config['model']['pregis_net']['mermaid_net']['similarity_measure']
+    if model_folder is not None:
+        mermaid_config_file = os.path.join(model_folder, 'mermaid_config_' + sim + ' .json')
+    else:
+        mermaid_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/mermaid_config_{}.json".format(dataset, sim))
+
+    with open(mermaid_config_file) as f:
+        mermaid_config = json.load(f)
+
 
 
     sigma = mermaid_config['model']['registration_model']['similarity_measure']['sigma']

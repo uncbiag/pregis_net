@@ -44,6 +44,8 @@ class Pseudo3DDataset(Dataset):
         else:
             raise ValueError('Mode not supported')
         self.atlas_file = atlas_file
+        self.image_io = py_fio.ImageIO()
+        self.atlas, _, _, _ = self.image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
 
 
     def __len__(self):
@@ -51,11 +53,8 @@ class Pseudo3DDataset(Dataset):
 
     def __getitem__(self, idx):
         image_file = self.image_files[idx]
-        image_io = py_fio.ImageIO()
-
-        image, _, _, _ = image_io.read_to_nc_format(image_file, silent_mode=True)
-        atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
-        return image[0,...], atlas[0,...]
+        image, _, _, _ = self.image_io.read_to_nc_format(image_file, silent_mode=True)
+        return image[0,...], self.atlas[0,...]
 
 
 

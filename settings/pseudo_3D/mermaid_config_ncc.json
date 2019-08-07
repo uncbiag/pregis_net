@@ -34,7 +34,7 @@
             },
             "similarity_measure": {
                 "develop_mod_on": false,
-                "sigma": 1.0,
+                "sigma": 1,
                 "type": "ncc"
             },
             "spline_order": 1,

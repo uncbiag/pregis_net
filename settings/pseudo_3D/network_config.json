@@ -9,7 +9,8 @@
         "pregis_net":{
             "mermaid_net": {
                 "name": "MermaidNet",
-                "gamma_mermaid": 1
+                "gamma_mermaid": 1,
+                "similarity_measure": "ncc"
             },
             "recons_net": {
                 "name": "VaeNet",
@@ -19,7 +20,7 @@
         }
     },
     "train":{
-        "n_of_epochs":100,
+        "n_of_epochs":50,
         "batch_size":2,
         "min_summary_period":15,
         "optimizer":{
@@ -28,16 +29,16 @@
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
-                   25,
-                   50,
-                   75
+                   15,
+                   30,
+                   40
                 ],
                 "gamma": 0.1
             }
         }
     },
     "validate":{
-        "batch_size":1,
+        "batch_size":2,
         "validate_epoch_period":1
     },
     "test":{

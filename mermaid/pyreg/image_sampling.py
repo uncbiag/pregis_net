@@ -120,6 +120,7 @@ class ResampleImage(object):
         #     raise('For upsampling sizes need to increase')
 
         newspacing = spacing*((sz[2::].astype('float')-1)/(desiredSizeNC[2::].astype('float')-1))##################################
+        #idDes_old = AdaptVal(torch.from_numpy(utils.identity_map_multiN(desiredSizeNC,newspacing)))
         idDes = AdaptVal(upResId)
 
         # now use this map for resampling
@@ -155,8 +156,9 @@ class ResampleImage(object):
         smoothedImage_multiNC = smoother.smooth(I)
 
         newspacing = spacing*((sz[2::].astype('float')-1.)/(desiredSizeNC[2::].astype('float')-1.)) ###########################################
-        #idDes = AdaptVal(torch.from_numpy(utils.identity_map_multiN(desiredSizeNC,newspacing)))
+        #idDes_old = AdaptVal(torch.from_numpy(utils.identity_map_multiN(desiredSizeNC,newspacing)))
         idDes = AdaptVal(lowResId)
+
 
         # now use this map for resampling
         ID = utils.compute_warped_image_multiNC(smoothedImage_multiNC, idDes, newspacing, spline_order,zero_boundary=zero_boundary)

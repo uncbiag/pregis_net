@@ -70,9 +70,9 @@ def image_pair_registration(moving_images_w_masks, target_images_w_masks, target
     return warped_images_w_masks, deformation_map, momentum
 
 
-def _compute_low_res_image(I,spacing,low_res_size):
+def _compute_low_res_image(I,spacing,low_res_size, lowResId):
     sampler = py_is.ResampleImage()
-    low_res_image, _ = sampler.downsample_image_to_size(I, spacing, low_res_size[2::],1)
+    low_res_image, _ = sampler.downsample_image_to_size(I, spacing, low_res_size[2::], lowResId ,1)
     return low_res_image
 
 

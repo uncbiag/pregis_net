@@ -98,10 +98,10 @@ class MermaidNet(nn.Module):
 
     def mermaid_shoot(self, moving, target, momentum):
         self.set_mermaid_params(moving=moving, target=target, momentum=momentum)
-        lowResMoving = _compute_low_res_image(target, self.spacing, self.lowResSize)
+        lowResMoving = _compute_low_res_image(target, self.spacing, self.lowResSize, self.lowResIdentityMap)
         lowResPhi = self.mermaid_unit(self.lowResIdentityMap, lowResMoving)
         desiredSz = self.identityMap.size()[2:]
-        phi, _ = self.sampler.upsample_image_to_size(lowResPhi, self.spacing, desiredSz, spline_order=1)
+        phi, _ = self.sampler.upsample_image_to_size(lowResPhi, self.spacing, desiredSz, self.identityMap, spline_order=1)
         moving_warped = py_utils.compute_warped_image_multiNC(moving, phi, self.spacing, spline_order=1)
         return moving_warped, phi
 

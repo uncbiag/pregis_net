@@ -77,7 +77,7 @@ class Pseudo3DDataset(Dataset):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        return self.images[idx,...], self.atlas[idx,...]
+        return self.images[idx,...], self.atlas[0,...]
 
 
 

@@ -61,16 +61,11 @@ class Pseudo3DDataset(Dataset):
             raise ValueError("Type not supported")
 
         self.atlas_file = atlas_file
-        self.image_io = py_fio.ImageIO()
-        self.atlas, _, _, _ = self.image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
-        for i in range(len(self.image_files)):
-            image, _, _, _ = self.image_io.read_to_nc_format(self.image_files[i], silent_mode=True)
-            print("Image {}: {} is loaded".format(i+1, self.image_files[i]))
-            if i == 0:
-                self.images = image
-            else:
-                self.images = np.concatenate((self.images, image), axis=0)
-        print(self.images.shape)
+        image_io = py_fio.ImageIO()
+        self.atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
+        image, _, _, _ = image_io.read_to_nc_format(self.image_files[0], silent_mode=True)
+
+        self.images, _, _, _ = image_io.read_batch_to_nc_format(self.image_files, silent_mode=True)
 
 
     def __len__(self):

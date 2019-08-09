@@ -31,8 +31,6 @@ class Pseudo3DDataset(Dataset):
             raise ValueError("Type not supported")
 
 
-        #print(image_files)
-
         self.mode = mode
         num_of_all_files = len(image_files)
         num = num_of_all_files // 40

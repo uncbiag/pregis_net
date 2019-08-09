@@ -1686,7 +1686,7 @@ class SVFVectorMomentumMapNet(ShootingVectorMomentumNet):
             return ODE.ODEBlock(cparams)
 
 
-    def forward(self, phi, I0_source, phi_inv=None, variables_from_optimizer=None):
+    def forward(self, phi, I0_source = None, phi_inv=None, variables_from_optimizer=None):
         """
         Solved the scalar momentum forward equation and returns the map at time tTo
 
@@ -1696,6 +1696,7 @@ class SVFVectorMomentumMapNet(ShootingVectorMomentumNet):
         :param variables_from_optimizer: allows passing variables (as a dict from the optimizer; e.g., the current iteration)
         :return: image at time tTo
         """
+
 
         pars_to_pass_s = utils.combine_dict({'I':I0_source},self._get_default_dictionary_to_pass_to_integrator())
         dt = self.integrator.get_dt()

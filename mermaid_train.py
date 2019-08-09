@@ -133,7 +133,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
                 if min_val_loss == 0.0 and global_step >= 50:
                     min_val_loss = eval_loss_dict['mermaid_all_loss']
-                if eval_loss_dict['mermaid_all_loss'] <= min_val_loss:
+                if eval_loss_dict['mermaid_all_loss'] < min_val_loss:
                     min_val_loss = eval_loss_dict['mermaid_all_loss']
                     save_file = os.path.join(my_model_folder, 'best_eval.pth.tar')
                     print("Writing current best eval model")

@@ -24,7 +24,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
     print('summary_batch_period:', str(summary_batch_period))
     print("validate_epoch_period:", str(validate_epoch_period))
 
-    writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 'logs', 'mermaid_net', my_name))
+    writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 'logs', 'vae_net', my_name))
 
     if model_path is not None:
         # resume training
@@ -127,7 +127,7 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
                                       eval_loss_dict[loss_key] / val_iters_per_epoch, global_step=global_step)
 
                 if min_val_loss == 0.0 and global_step >= 50:
-                    min_val_loss = eval_loss_dict['mermaid_all_loss']
+                    min_val_loss = eval_loss_dict['vae_all_loss']
                 if eval_loss_dict['vae_all_loss'] < min_val_loss:
                     min_val_loss = eval_loss_dict['vae_all_loss']
                     save_file = os.path.join(my_model_folder, 'best_eval.pth.tar')

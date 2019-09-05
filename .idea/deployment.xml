@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="xhs400@peen.cs.unc.edu:22" showExcludedInSync="true">
+  <component name="PublishConfigData" autoUpload="Always" serverName="peen" showExcludedInSync="true">
     <serverData>
-      <paths name="xhs400@peen.cs.unc.edu:22">
+      <paths name="peen">
         <serverdata>
           <mappings>
-            <mapping deploy="/tmp/pycharm_project_103" local="$PROJECT_DIR$" />
+            <mapping deploy="/tmp/pycharm_project_368" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

@@ -32,15 +32,14 @@ class Pseudo3DDataset(Dataset):
         self.mode = mode
         num_of_all_files = len(image_files)
         num = num_of_all_files // 10
-        print(num_of_all_files)
+        
 
-        # split the data for normal training and abnormal training, so that they don't overlap for sanity.
         if mode == 'training':
-            self.image_files = image_files[4 * num:10 * num]
+            self.image_files = image_files[4*num:10*num]
         elif mode == 'validation':
-            self.image_files = image_files[2 * num:4 * num]
+            self.image_files = image_files[2*num:4*num]
         elif mode == 'testing':
-            self.image_files = image_files[0:2 * num]
+            self.image_files = image_files[0:2*num]
         else:
             raise ValueError('Mode not supported')
 

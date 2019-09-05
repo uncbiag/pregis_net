@@ -13,6 +13,7 @@ import pyreg.fileio as py_fio
 
 from modules.pregis_net import PregisNet
 from modules.mermaid_net import MermaidNet
+from modules.vae_net import VaeNet
 from torch.utils.data import DataLoader, Dataset
 
 from data_loaders import pseudo_2D as pseudo_2D_dataset
@@ -45,6 +46,8 @@ def create_model(network_config, model_name):
         model = PregisNet(network_config)
     elif model_name == 'mermaid_net':
         model = MermaidNet(network_config)
+    elif model_name == 'vae_net':
+        model = VaeNet(network_config)
     else:
         raise ValueError("Model Not supported")
     model.cuda()

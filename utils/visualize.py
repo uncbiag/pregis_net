@@ -79,7 +79,8 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
             raise ValueError("dimension not supported")
 
         grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(images_to_show), normalize=True, range=(0,1))
-        grids['grid'] = vision_utils.make_grid(grid_slices_to_show, pad_value=1, nrow=dim)
+        if len(grid_slices_to_show) > 0 :
+            grids['grid'] = vision_utils.make_grid(grid_slices_to_show, pad_value=1, nrow=dim)
     return grids
 
 

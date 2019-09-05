@@ -15,7 +15,9 @@
             "recons_net": {
                 "name": "VaeNet",
                 "gamma_recons": 1,
-                "use_TV_loss": false
+                "use_TV_loss": false,
+                "KLD_weight": 0.001,
+                "TV_weight": 0.1
             }
         }
     },

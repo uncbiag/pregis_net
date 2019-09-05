@@ -12,7 +12,7 @@ import pyreg.image_sampling as py_is
 import pyreg.similarity_measure_factory as smf
 
 import losses.loss as loss
-from modules.vae import VaeNet
+from modules.vae_net import VaeNet
 from modules.u_net import UNet
 
 

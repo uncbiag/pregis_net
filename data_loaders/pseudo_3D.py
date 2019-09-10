@@ -29,7 +29,6 @@ class Pseudo3DDataset(Dataset):
 
         self.dataset_mode = dataset_mode
         num_of_all_files = len(image_files)
-        num_of_all_files = 10
         num = num_of_all_files // 10
 
         if dataset_mode == 'training':

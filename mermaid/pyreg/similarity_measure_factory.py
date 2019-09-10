@@ -539,7 +539,7 @@ class LNCCSimilarity(SimilarityMeasure):
             input_local_var = input_2_local_sum - input_local_sum ** 2 / numel
             target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 
-            lncc = (cross * cross + 1e-5) / (input_local_var * target_local_var + 1e-5)
+            lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
             lncc = 1 - lncc.mean()
             lncc_total += lncc * self.weight[scale_id]
 
@@ -728,7 +728,7 @@ class CustLNCCSimilarity(SimilarityMeasure):
                 input_local_var = input_2_local_sum - input_local_sum ** 2 / numel
                 target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 
-                lncc = (cross * cross + 1e-5) / (input_local_var * target_local_var + 1e-5)
+                lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
                 lncc = 1 - lncc.mean()
                 sim += lncc * self.weight[scale_id]
         return sim

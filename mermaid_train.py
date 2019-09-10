@@ -187,8 +187,6 @@ def train_network():
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
 
-
-
     sigma = mermaid_config['model']['registration_model']['similarity_measure']['sigma']
     init_lr = network_config['train']['optimizer']['lr']
     model_path = None

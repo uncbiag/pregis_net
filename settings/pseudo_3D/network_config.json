@@ -1,33 +1,32 @@
 {
     "model":{
-        "n_of_feature": 32,
-        "activation_function": "LeakyReLU",
-        "bn": false,
-        "dp": false,
-        "dp_p": 0.2,
         "dataset": "pseudo_3D",
         "pregis_net":{
             "mermaid_net": {
-                "name": "MermaidNet",
-                "gamma_mermaid": 1,
-                "similarity_measure": "ncc"
+                "n_of_feature": 32,
+                "bn": true,
+                "dp": false,
+                "dp_p": 0.2
             },
             "recons_net": {
-                "name": "VaeNet",
-                "gamma_recons": 1,
+                "n_of_feature": 32,
+                "bn": true,
+                "dp": false,
+                "dp_p": 0.2,
                 "use_TV_loss": false,
                 "KLD_weight": 0.001,
-                "TV_weight": 0.1
+                "TV_weight": 0.1,
+                "recons_weight": 1
             }
         }
     },
     "train":{
-        "n_of_epochs":100,
-        "batch_size":2,
+        "n_of_epochs":150,
+        "batch_size":1,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.0005,
+            "lr": 0.01,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
@@ -35,7 +34,7 @@
                    50,
                    75
                 ],
-                "gamma": 0.1
+                "gamma": 1
             }
         }
     },

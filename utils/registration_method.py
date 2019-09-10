@@ -59,7 +59,7 @@ def image_pair_registration(moving_images_w_masks, target_images_w_masks, target
                        model_name='svf_vector_momentum_map',
                        use_multi_scale=False,
                        use_batch_optimization=False,
-                       json_config_out_filename=os.path.join(result_folder, 'mermaid_config_lncc.json'),
+                       json_config_out_filename=os.path.join(result_folder, 'mermaid_config.json'),
                        params=registration_param_file,
                        map_low_res_factor=map_resolution)
 

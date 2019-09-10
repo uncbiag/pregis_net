@@ -6,8 +6,8 @@ from utils.utils import *
 
 
 class Pseudo3DDataset(Dataset):
-    def __init__ (self, mode='training', type='normal'):
-        root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net'
+    def __init__(self, dataset_mode='training', network_mode='pregis'):
+        root_folder = '/playpen1/xhs400/Research/data/data_for_pregis_net'
 
         oasis_affined_folder = os.path.join(root_folder, 'oasis_3', 'affined')
         oasis_brain_folder = os.path.join(oasis_affined_folder, 'normalized', 'pseudo_not_used')
@@ -17,29 +17,27 @@ class Pseudo3DDataset(Dataset):
 
         pseudo_folder = os.path.join(root_folder, 'pseudo', 'pseudo_3D')
         pseudo_tumor_folder = os.path.join(pseudo_folder, 'tumor')
-        pseudo_no_tumor_folder = os.path.join(pseudo_folder, 'no_tumor')
+        # pseudo_no_tumor_folder = os.path.join(pseudo_folder, 'no_tumor')
 
-        print(type)
-        if type == 'tumor':
+        print("Network Mode: {}".format(network_mode))
+        if network_mode == 'pregis':
             image_files = sorted(glob.glob(os.path.join(pseudo_tumor_folder, '*.nii.gz')))
-        elif type == 'no_tumor':  # These are not normal images
-            image_files = sorted(glob.glob(os.path.join(pseudo_no_tumor_folder, '*.nii.gz')))
-        elif type == 'normal':
+        elif network_mode == 'mermaid' or network_mode == 'recons':
             image_files = sorted(glob.glob(os.path.join(oasis_brain_folder, '*.nii.gz')))
         else:
-            raise ValueError("Type not supported")
+            raise ValueError("Network mode not supported")
 
-        self.mode = mode
+        self.dataset_mode = dataset_mode
         num_of_all_files = len(image_files)
+        num_of_all_files = 10
         num = num_of_all_files // 10
-        
 
-        if mode == 'training':
-            self.image_files = image_files[4*num:10*num]
-        elif mode == 'validation':
-            self.image_files = image_files[2*num:4*num]
-        elif mode == 'testing':
-            self.image_files = image_files[0:2*num]
+        if dataset_mode == 'training':
+            self.image_files = image_files[4 * num:10 * num]
+        elif dataset_mode == 'validation':
+            self.image_files = image_files[2 * num:4 * num]
+        elif dataset_mode == 'testing':
+            self.image_files = image_files[0:2 * num]
         else:
             raise ValueError('Mode not supported')
 
@@ -48,34 +46,8 @@ class Pseudo3DDataset(Dataset):
         self.atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
         self.images, _, _, _ = image_io.read_batch_to_nc_format(self.image_files, silent_mode=True)
 
-
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        return self.images[idx,...], self.atlas[0,...]
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        return self.images[idx, ...], self.atlas[0, ...]

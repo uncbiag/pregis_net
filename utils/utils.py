@@ -1,30 +1,24 @@
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler 
+import torch.optim.lr_scheduler as lr_scheduler
 import torch.nn.functional as F
-import sys 
+import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../mermaid'))
 import pyreg.fileio as py_fio
 
 from modules.pregis_net import PregisNet
-from modules.mermaid_net import MermaidNet
-from modules.vae_net import VaeNet
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 
 from data_loaders import pseudo_2D as pseudo_2D_dataset
 from data_loaders import pseudo_3D as pseudo_3D_dataset
 from data_loaders import brats_3D as brats_3D_dataset
 
 
-
-
 def collate_fn_cbctdataset(batch):
-    
     moving_image, moving_label, target_image, target_label, momentum, target_spacing = zip(*batch)
     m_image = torch.from_numpy(moving_image[0])
     m_label = torch.from_numpy(moving_label[0])
@@ -38,25 +32,19 @@ def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
         nn.init.xavier_uniform_(m.weight.data)
-        nn.init.constant_(m.bias.data,0)
+        nn.init.constant_(m.bias.data, 0)
 
 
-def create_model(network_config, model_name):
-    if model_name == 'pregis_net':
-        model = PregisNet(network_config)
-    elif model_name == 'mermaid_net':
-        model = MermaidNet(network_config)
-    elif model_name == 'vae_net':
-        model = VaeNet(network_config)
-    else:
-        raise ValueError("Model Not supported")
+def create_model(network_config):
+    model = PregisNet(network_config)
     model.cuda()
     model.apply(weights_init)
     return model
 
 
-def create_dataloader(model_config, tr_config, va_config):
+def create_dataloader(model_config, tr_config, network_mode):
     dataset = model_config['dataset']
+    print("Dataset to load: {}".format(dataset))
     if dataset == "brats_3D":
         MyDataset = brats_3D_dataset.Brats3DDataset
     elif dataset == "pseudo_2D":
@@ -66,21 +54,33 @@ def create_dataloader(model_config, tr_config, va_config):
     else:
         raise ValueError("dataset not available")
 
-    my_train_dataset = MyDataset(mode='training')
-    my_validate_dataset = MyDataset(mode='validation')
+    my_train_dataset = MyDataset('training', network_mode)
+    my_validate_dataset = MyDataset('validation', network_mode)
     atlas_file = my_train_dataset.atlas_file
     print(atlas_file)
     image_io = py_fio.ImageIO()
-    target_image, target_hdrc, target_spacing,_ = image_io.read_to_nc_format(atlas_file, silent_mode=True)
+    target_image, target_hdrc, target_spacing, _ = image_io.read_to_nc_format(atlas_file, silent_mode=True)
 
-    train_data_loader = DataLoader(my_train_dataset, batch_size=tr_config['batch_size'], shuffle=True, num_workers=4, drop_last=True)
-    validate_data_loader = DataLoader(my_validate_dataset, batch_size=tr_config['batch_size'], shuffle=False, num_workers=4, drop_last=True)
-    #test_data_loader = DataLoader(my_test_dataset, batch_size=va_config['batch_size'], shuffle=False, num_workers=4, drop_last=True)
+    train_data_loader = DataLoader(my_train_dataset,
+                                   batch_size=tr_config['batch_size'],
+                                   shuffle=True, num_workers=4,
+                                   drop_last=True)
+    validate_data_loader = DataLoader(my_validate_dataset,
+                                      batch_size=tr_config['batch_size'],
+                                      shuffle=False,
+                                      num_workers=4,
+                                      drop_last=True)
+    # test_data_loader = DataLoader(my_test_dataset,
+    #                              batch_size=va_config['batch_size'],
+    #                              shuffle=False,
+    #                              num_workers=4,
+    #                              drop_last=True)
     model_config['img_sz'] = [tr_config['batch_size'], 1] + list(target_image.shape[2:])
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc
     model_config['target_spacing'] = target_spacing
     return train_data_loader, validate_data_loader
+
 
 def create_optimizer(config, model):
     method = config['optimizer']['name']
@@ -108,18 +108,12 @@ def create_loss(config):
         criterion = nn.MSELoss(reduction=reduction).cuda()
     elif name == 'L1':
         criterion = nn.L1Loss(reduction=reduction).cuda()
-    #elif name == 'L12':
-        #criterion = loss.L12Loss().cuda()
     else:
         print('Loss specified unrecognized. MSE Loss is used')
         criterion = nn.MSELoss(reduction=reduction).cuda()
     return criterion
 
 
-
-
-
 if __name__ == '__main__':
     # This is to test the results from evaluate_model
     print('test')
-

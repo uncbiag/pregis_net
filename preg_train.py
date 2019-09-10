@@ -171,22 +171,25 @@ def train_model(model, train_data_loader, validate_data_loader, optimizer, sched
 
 def train_network():
     dataset = 'pseudo_3D'
-    sim = 'ncc'
     now = datetime.datetime.now()
     my_time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year, now.month, now.day, now.hour, now.minute, now.second)
+
+    # training network : Pregis / Mermaid / Vae
+    training_network = 'Pregis'
     is_continue = False
     model_folder = None
 
     if is_continue:
-        model_folder = os.path.join(os.path.dirname(__file__), "/main/tmp_models/my_model_20190324-011739")
+        # folder needs to be specified for continuing
+        model_folder = os.path.join(os.path.dirname(__file__), "/main")
         my_name = model_folder.split('/')[-1]
     if model_folder is not None:
         network_config_file = os.path.join(model_folder, 'network_config.json')
-        for file in glob.glob(os.path.join(model_folder, 'mermaid_config_*.json')):
+        for file in glob.glob(os.path.join(model_folder, 'mermaid_config.json')):
             mermaid_config_file = file
     else:
         network_config_file = os.path.join(os.path.dirname(__file__), "settings/{}/network_config.json".format(dataset))
-        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config_' + sim + '.json'.format(dataset))
+        mermaid_config_file= os.path.join(os.path.dirname(__file__), 'settings/{}/mermaid_config.json'.format(dataset))
     with open(mermaid_config_file) as f:
         mermaid_config = json.load(f)
     with open(network_config_file) as f:

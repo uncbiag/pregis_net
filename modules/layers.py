@@ -1,12 +1,10 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
-
-class mp(nn.Module):
+class MaxPool(nn.Module):
     def __init__(self, kernel_size=2, dim=3):
-        super(mp, self).__init__()
+        super(MaxPool, self).__init__()
         if dim == 1:
             max_pool = nn.MaxPool1d
         elif dim == 2:
@@ -16,20 +14,19 @@ class mp(nn.Module):
         else:
             raise ValueError("Dimension error")
 
-        self.mp = max_pool(kernel_size)
-        return 
-
+        self.max_pool = max_pool(kernel_size)
+        return
 
     def forward(self, x):
-        return self.mp(x)
+        return self.max_pool(x)
 
 
-class conv_bn_rel_dp(nn.Module):
+class ConBnRelDp(nn.Module):
     # conv + batch_normalize + relu + dropout
     def __init__(self, in_ch, out_ch, kernel_size, stride=1, activate_unit='relu', same_padding=True,
                  use_bn=False, use_dp=False, reverse=False, group=1, dilation=1, dim=3):
-        super(conv_bn_rel_dp, self).__init__()
-        padding = int((kernel_size-1)/2) if same_padding else 0
+        super(ConBnRelDp, self).__init__()
+        padding = int((kernel_size - 1) / 2) if same_padding else 0
         if dim == 1:
             conv = nn.Conv1d
             batch_norm = nn.BatchNorm1d
@@ -65,7 +62,6 @@ class conv_bn_rel_dp(nn.Module):
 
         return
 
-
     def forward(self, x):
         x = self.conv(x)
         if self.batch_norm is not False:
@@ -75,6 +71,7 @@ class conv_bn_rel_dp(nn.Module):
         if self.drop_out is not False:
             x = self.drop_out(x)
         return x
+
 
 class fc_rel(nn.Module):
     def __init__(self, in_ft, out_ft, activate_unit='relu', use_dp=False):
@@ -98,6 +95,7 @@ class fc_rel(nn.Module):
         if self.drop_out is not False:
             x = self.drop_out(x)
         return x
+
 
 class unet_forward_conv(nn.Module):
     def __init__(self, in_ch, out_ch, dim=3, use_bn=False, use_dp=False):
@@ -157,6 +155,7 @@ class unet_down_conv(nn.Module):
     def forward(self, x):
         return self.conv(x)
 
+
 class unet_up_conv(nn.Module):
     def __init__(self, in_ch, out_ch, dim=3, use_bn=False, use_dp=False):
         super(unet_up_conv, self).__init__()
@@ -172,12 +171,12 @@ class unet_up_conv(nn.Module):
         self.up = conv_t(in_ch, out_ch, kernel_size=2, stride=2)
         self.conv = unet_forward_conv(in_ch, out_ch, dim, use_bn, use_dp)
 
-
     def forward(self, x1, x2):
         x1 = self.up(x1)
-        assert(x1.size() == x2.size())
+        assert (x1.size() == x2.size())
         x = torch.cat([x2, x1], dim=1)
         return self.conv(x)
+
 
 class unet_out_conv(nn.Module):
     def __init__(self, in_ch, out_ch, dim=3):
@@ -196,6 +195,3 @@ class unet_out_conv(nn.Module):
     def forward(self, x):
         x = self.conv(x)
         return x
-
-
-

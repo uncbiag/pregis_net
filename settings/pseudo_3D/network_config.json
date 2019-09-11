@@ -21,12 +21,12 @@
         }
     },
     "train":{
-        "n_of_epochs":150,
+        "n_of_epochs":100,
         "batch_size":4,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.0005,
+            "lr": 0.01,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [

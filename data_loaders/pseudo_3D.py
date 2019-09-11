@@ -7,14 +7,16 @@ from utils.utils import *
 import progressbar as pb
 import blosc
 import multiprocessing
+import socket
 blosc.set_nthreads(1)
 
 
 class Pseudo3DDataset(Dataset):
     def __init__(self, dataset_mode='training', network_mode='pregis'):
-        self.num_of_workers = 12
-        root_folder = '/playpen1/xhs400/Research/data/data_for_pregis_net'
 
+        root_folder = self.__set_root_folder()
+        assert(root_folder is not None)
+        self.num_of_workers = 12
         oasis_affined_folder = os.path.join(root_folder, 'oasis_3', 'affined')
         oasis_brain_folder = os.path.join(oasis_affined_folder, 'normalized', 'pseudo_not_used')
 
@@ -94,3 +96,13 @@ class Pseudo3DDataset(Dataset):
             count += 1
             pbar.update(count)
         pbar.finish()
+
+
+    def __set_root_folder(self):
+        hostname = socket.gethostname()
+        root_folder = None
+        if hostname == 'biag-gpu0.cs.unc.edu':
+            root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net'
+        elif hostname == 'biag-w05.cs.unc.edu':
+            root_folder = '/playpen1/xhs400/Research/data/data_for_pregis_net'
+        return root_folder

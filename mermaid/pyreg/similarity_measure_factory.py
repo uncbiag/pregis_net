@@ -535,7 +535,7 @@ class LNCCSimilarity(SimilarityMeasure):
 
             numel = float(np.array(self.kernel_sz[scale_id]).prod())
 
-            cross = input_target_local_sum - input_local_sum * (target_local_sum / numel)
+            cross = input_target_local_sum - input_local_sum * target_local_sum / numel
             input_local_var = input_2_local_sum - input_local_sum ** 2 / numel
             target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 
@@ -724,7 +724,7 @@ class CustLNCCSimilarity(SimilarityMeasure):
 
                 numel = float(np.array(self.kernel_sz[scale_id]).prod())
 
-                cross = input_target_local_sum - input_local_sum * (target_local_sum / numel)
+                cross = input_target_local_sum - input_local_sum * target_local_sum / numel
                 input_local_var = input_2_local_sum - input_local_sum ** 2 / numel
                 target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 

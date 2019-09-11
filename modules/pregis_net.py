@@ -54,7 +54,7 @@ class PregisNet(nn.Module):
         elif self.network_mode == 'mermaid':
             self.warped_image, self.phi = self.mermaid_net(moving, target)
         elif self.network_mode == 'recons':
-            self.recons_image = self.vae_net(moving, target)
+            self.recons_image = self.recons_net(moving, target)
         else:
             raise ValueError("Network option is not correct.")
 

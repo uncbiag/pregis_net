@@ -82,7 +82,7 @@ class ReconsNet(nn.Module):
 
     def calculate_vae_loss(self, input_image, target_image):
         loss_dict = {}
-        kld_element = self.mu.pow(2).add_(self.logvar.exp()).mul_(-1).add_(1).add_(self.logvar)
+        kld_element = self.mu.pow(2).add_(self.log_var.exp()).mul_(-1).add_(1).add_(self.log_var)
         kld_loss = torch.mean(kld_element).mul_(-0.5)
         loss_dict['vae_kld_loss'] = kld_loss
 
@@ -96,16 +96,16 @@ class ReconsNet(nn.Module):
             recons_loss = recons_loss_11
         loss_dict['vae_recons_loss'] = recons_loss
 
-        sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
-        loss_dict['vae_sim_loss'] = sim_loss
+        #sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
+        #loss_dict['vae_sim_loss'] = sim_loss
 
-        all_vae_loss = self.KLD_weight * kld_loss + self.recons_weight * recons_loss + sim_loss
+        all_vae_loss = self.KLD_weight * kld_loss + self.recons_weight * recons_loss # + sim_loss
         loss_dict['vae_all_loss'] = all_vae_loss
         return loss_dict
 
     def forward(self, input_image, target_image):
         self.mu, self.log_var = self.encode(input_image, target_image)
-        z = self.reparameterize(self.mu, self.logvar)
+        z = self.reparameterize(self.mu, self.log_var)
         self.recons_image = self.decode(z)
         return self.recons_image
 

@@ -12,7 +12,7 @@ class TrainPregis:
 
     def __init__(self):
         self.dataset = 'pseudo_3D'
-        self.network_mode = 'mermaid'
+        self.network_mode = 'recons'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
         self.time = None
 
@@ -270,7 +270,7 @@ class TrainPregis:
 
                     if self.network_mode == 'recons' or self.network_mode == 'pregis':
                         images_to_show.append(self.pregis_net.recons_image.detach())
-                        to_print += ', vae_loss:{:.6f}, vae_sim_loss:{:.6f}, recons_loss:{:.6f}, l1_loss:{:.6f}, tv_loss{:.6f}, kld_loss{:.6f}'.format(
+                        to_print += ', vae_loss:{:.6f}, vae_sim_loss:{:.6f}, recons_loss:{:.6f}, l1_loss:{:.6f}, tv_loss:{:.6f}, kld_loss:{:.6f}'.format(
                             epoch_loss_dict['vae_all_loss'] / summary_batch_period,
                             epoch_loss_dict['vae_sim_loss'] / summary_batch_period,
                             epoch_loss_dict['vae_recons_loss'] / summary_batch_period,

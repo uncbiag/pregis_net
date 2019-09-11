@@ -1,12 +1,18 @@
 from __future__ import print_function, division
 from torch.utils.data import Dataset, DataLoader
 
+import numpy as np
 import glob
 from utils.utils import *
+import progressbar as pb
+import blosc
+import multiprocessing
+blosc.set_nthreads(1)
 
 
 class Pseudo3DDataset(Dataset):
     def __init__(self, dataset_mode='training', network_mode='pregis'):
+        self.num_of_workers = 12
         root_folder = '/playpen1/xhs400/Research/data/data_for_pregis_net'
 
         oasis_affined_folder = os.path.join(root_folder, 'oasis_3', 'affined')
@@ -43,10 +49,48 @@ class Pseudo3DDataset(Dataset):
         self.atlas_file = atlas_file
         image_io = py_fio.ImageIO()
         self.atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
-        self.images, _, _, _ = image_io.read_batch_to_nc_format(self.image_files, silent_mode=True)
+
+        manager = multiprocessing.Manager()
+        self.images_dict = manager.dict()
+        split_list = self.__split_image_files()
+        process = []
+        for i in range(self.num_of_workers):
+            p = multiprocessing.Process(target=self.__load_images_and_compress, args=(split_list[i],))
+            p.start()
+            process.append(p)
+
+        for p in process:
+            p.join()
+        print("Finish loading images")
+        return
 
     def __len__(self):
         return len(self.image_files)
 
     def __getitem__(self, idx):
-        return self.images[idx, ...], self.atlas[0, ...]
+        image_name = self.image_files[idx]
+        image_compressed = self.images_dict[image_name]
+        image = blosc.unpack_array(image_compressed)
+        return image[0, ...], self.atlas[0, ...]
+
+    def __split_image_files(self):
+        index_list = list(range(len(self.image_files)))
+        index_split = np.array_split(np.array(index_list), self.num_of_workers)
+        split_list = []
+        for i in range(self.num_of_workers):
+            current_list = self.image_files[index_split[i][0]:index_split[i][0] + len(index_split[i])]
+            split_list.append(current_list)
+        return split_list
+
+    def __load_images_and_compress(self, image_list):
+        pbar = pb.ProgressBar(widgets=[pb.Percentage(), pb.Bar(), pb.ETA()], maxval=len(image_list)).start()
+        count = 0
+        image_io = py_fio.ImageIO()
+
+        for fn in image_list:
+            image, _, _, _ = image_io.read_to_nc_format(fn, silent_mode=True)
+            image_compressed = blosc.pack_array(image)
+            self.images_dict[fn] = image_compressed
+            count += 1
+            pbar.update(count)
+        pbar.finish()

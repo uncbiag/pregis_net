@@ -730,6 +730,7 @@ class CustLNCCSimilarity(SimilarityMeasure):
                 target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 
                 lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
+                torch.clamp(lncc, 0, 1)
                 lncc = 1 - lncc.mean()
                 sim += lncc * self.weight[scale_id]
         return sim

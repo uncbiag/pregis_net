@@ -140,12 +140,13 @@ class TrainPregis:
             if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
                 my_name = my_name + '_sigma_{}'.format(sigma)
 
-            if self.network_mode == 'vae' or self.network_mode == 'pregis':
-                use_tv_loss = self.network_config['pregis_net']['recons_net']['use_TV_loss']
+            if self.network_mode == 'recons' or self.network_mode == 'pregis':
+                print(self.network_config)
+                use_tv_loss = self.network_config['model']['pregis_net']['recons_net']['use_TV_loss']
 
-                kld_weight = self.network_config['pregis_net']['recons_net']['KLD_weight']
-                tv_weight = self.network_config['pregis_net']['recons_net']['TV_weight']
-                recons_weight = self.network_config['pregis_net']['recons_net']['recons_weight']
+                kld_weight = self.network_config['model']['pregis_net']['recons_net']['KLD_weight']
+                tv_weight = self.network_config['model']['pregis_net']['recons_net']['TV_weight']
+                recons_weight = self.network_config['model']['pregis_net']['recons_net']['recons_weight']
                 my_name = my_name + '_kld_{}_recons_{}_useTV_{}_tv_{}'.format(kld_weight,
                                                                               recons_weight,
                                                                               use_tv_loss,

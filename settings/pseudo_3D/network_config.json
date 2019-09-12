@@ -23,7 +23,7 @@
     },
     "train":{
         "n_of_epochs":100,
-        "batch_size":2,
+        "batch_size":4,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",

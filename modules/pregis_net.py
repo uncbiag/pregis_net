@@ -24,6 +24,7 @@ class PregisNet(nn.Module):
         self.warped_image = None
         self.phi = None
         self.recons_image = None
+        self.diff_image = None
 
         return
 
@@ -54,15 +55,15 @@ class PregisNet(nn.Module):
 
         if self.network_mode == 'pregis':
             self.warped_image, self.phi = self.mermaid_net(moving, target)
-            self.recons_image = self.recons_net(self.warped_image, target)
+            self.recons_image, self.diff_image = self.recons_net(self.warped_image, target)
         elif self.network_mode == 'mermaid':
             self.warped_image, self.phi = self.mermaid_net(moving, target)
         elif self.network_mode == 'recons':
-            self.recons_image = self.recons_net(moving, target)
+            self.recons_image, self.diff_image = self.recons_net(moving, target)
         else:
             raise ValueError("Network option is not correct.")
 
-        return self.warped_image, self.recons_image, self.phi
+        return
 
     def forward(self, moving, target):
         self.single_forward(moving, target)

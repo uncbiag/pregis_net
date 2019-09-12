@@ -66,7 +66,7 @@ class ReconsNet(nn.Module):
         self.mu = None
         self.log_var = None
         self.recons_image = None
-
+        self.diff_image = None
         return
 
     def encode(self, x1, x2):
@@ -83,7 +83,7 @@ class ReconsNet(nn.Module):
         return z
 
     def calculate_vae_loss(self, input_image, target_image, current_epoch):
-        if current_epoch > 20:
+        if current_epoch > 10:
             self.network_mode = 'pregis'
         loss_dict = {}
         kld_element = self.mu.pow(2).add_(self.log_var.exp()).mul_(-1).add_(1).add_(self.log_var)
@@ -113,7 +113,8 @@ class ReconsNet(nn.Module):
         self.mu, self.log_var = self.encode(input_image, target_image)
         z = self.reparameterize(self.mu, self.log_var)
         self.recons_image = self.decode(z)
-        return self.recons_image
+        self.diff_image = input_image - self.recons_image
+        return self.recons_image, self.diff_image
 
 
 

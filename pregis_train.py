@@ -13,7 +13,7 @@ class TrainPregis:
     def __init__(self):
         self.dataset = 'pseudo_3D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
-        self.network_mode = 'pregis'
+        self.network_mode = 'recons'
 
         self.time = None
 
@@ -139,8 +139,10 @@ class TrainPregis:
                 kld_weight = self.network_config['model']['pregis_net']['recons_net']['KLD_weight']
                 tv_weight = self.network_config['model']['pregis_net']['recons_net']['TV_weight']
                 recons_weight = self.network_config['model']['pregis_net']['recons_net']['recons_weight']
-                my_name = my_name + '_kld_{}_recons_{}_useTV_{}_tv_{}'.format(kld_weight,
+                sim_weight = self.network_config['model']['pregis_net']['recons_net']['sim_weight']
+                my_name = my_name + '_kld_{}_recons_{}_sim_{}_useTV_{}_tv_{}'.format(kld_weight,
                                                                               recons_weight,
+                                                                              sim_weight,
                                                                               use_tv_loss,
                                                                               tv_weight)
 
@@ -274,6 +276,7 @@ class TrainPregis:
 
                     if self.network_mode == 'recons' or self.network_mode == 'pregis':
                         images_to_show.append(self.pregis_net.recons_image.detach())
+                        images_to_show.append(self.pregis_net.diff_image.detach())
                         to_print += ', vae_loss:{:.6f}, vae_sim_loss:{:.6f}, recons_loss:{:.6f}, l1_loss:{:.6f}, tv_loss:{:.6f}, kld_loss:{:.6f}'.format(
                             epoch_loss_dict['vae_all_loss'] / summary_batch_period,
                             epoch_loss_dict['vae_sim_loss'] / summary_batch_period,
@@ -336,6 +339,7 @@ class TrainPregis:
 
                             if self.network_mode == 'recons' or self.network_mode == 'pregis':
                                 images_to_show.append(self.pregis_net.recons_image.detach())
+                                images_to_show.append(self.pregis_net.diff_image.detach())
 
                             image_summary = make_image_summary(images_to_show, phis_to_show)
                             for key, value in image_summary.items():

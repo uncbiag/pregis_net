@@ -13,7 +13,7 @@ blosc.set_nthreads(1)
 
 
 class Pseudo3DDataset(Dataset):
-    def __init__(self, dataset_mode='training', network_mode='pregis'):
+    def __init__(self, dataset_mode='training', dataset_type='normal'):
 
         root_folder = self.__set_root_folder()
         assert (root_folder is not None)
@@ -28,13 +28,13 @@ class Pseudo3DDataset(Dataset):
         pseudo_tumor_folder = os.path.join(pseudo_folder, 'tumor')
         # pseudo_no_tumor_folder = os.path.join(pseudo_folder, 'no_tumor')
 
-        print("Network Mode: {}".format(network_mode))
-        if network_mode == 'pregis':
+        print("Dataset Type to Load: {}".format(dataset_type))
+        if dataset_type == 'pseudo':
             image_files = sorted(glob.glob(os.path.join(pseudo_tumor_folder, '*.nii.gz')))
-        elif network_mode == 'mermaid' or network_mode == 'recons':
+        elif dataset_type == 'normal':
             image_files = sorted(glob.glob(os.path.join(oasis_brain_folder, '*.nii.gz')))
         else:
-            raise ValueError("Network mode not supported")
+            raise ValueError("Dataset Not Available")
 
         self.dataset_mode = dataset_mode
         num_of_all_files = len(image_files)

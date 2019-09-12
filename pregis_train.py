@@ -102,7 +102,7 @@ class TrainPregis:
         train_config = self.network_config['train']
 
         self.train_data_loader, self.validate_data_loader = \
-            create_dataloader(self.network_config['model'], train_config, self.network_mode)
+            create_dataloader(self.network_config['model'], train_config)
         self.pregis_net = create_model(self.network_config['model'], self.network_mode)
         self.pregis_net.network_mode = self.network_mode
 
@@ -323,7 +323,7 @@ class TrainPregis:
                         moving_image = moving_image.cuda()
                         target_image = target_image.cuda()
                         self.pregis_net(moving_image, target_image)
-                        loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image)
+                        loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image, current_epoch)
                         for loss_key in eval_loss_dict:
                             if loss_key in loss_dict:
                                 eval_loss_dict[loss_key] += loss_dict[loss_key].item()

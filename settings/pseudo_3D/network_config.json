@@ -1,6 +1,7 @@
 {
     "model":{
         "dataset": "pseudo_3D",
+	"dataset_type": "pseudo",
         "pregis_net":{
             "mermaid_net": {
                 "n_of_feature": 32,
@@ -14,16 +15,17 @@
                 "dp": false,
                 "dp_p": 0.2,
                 "use_TV_loss": false,
-                "KLD_weight": 0.001,
+                "KLD_weight": 0.01,
                 "TV_weight": 0.1,
                 "recons_weight": 1,
-                "sim_weight": 0.1
+                "sim_weight": 0.1,
+		"mode_change_epoch": 10
             }
         }
     },
     "train":{
         "n_of_epochs":100,
-        "batch_size":4,
+        "batch_size":2,
         "min_summary_period":15,
         "optimizer":{
             "name": "ADAM",

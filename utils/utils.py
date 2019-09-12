@@ -42,8 +42,9 @@ def create_model(network_config, network_mode):
     return model
 
 
-def create_dataloader(model_config, tr_config, network_mode):
+def create_dataloader(model_config, tr_config):
     dataset = model_config['dataset']
+    dataset_type = model_config['dataset_type']
     print("Dataset to load: {}".format(dataset))
     if dataset == "brats_3D":
         MyDataset = brats_3D_dataset.Brats3DDataset
@@ -54,8 +55,8 @@ def create_dataloader(model_config, tr_config, network_mode):
     else:
         raise ValueError("dataset not available")
 
-    my_train_dataset = MyDataset('training', network_mode)
-    my_validate_dataset = MyDataset('validation', network_mode)
+    my_train_dataset = MyDataset('training', dataset_type)
+    my_validate_dataset = MyDataset('validation', dataset_type)
     atlas_file = my_train_dataset.atlas_file
     print(atlas_file)
     image_io = py_fio.ImageIO()
@@ -67,7 +68,7 @@ def create_dataloader(model_config, tr_config, network_mode):
                                    drop_last=True)
     validate_data_loader = DataLoader(my_validate_dataset,
                                       batch_size=tr_config['batch_size'],
-                                      shuffle=False,
+                                      shuffle=True,
                                       num_workers=4,
                                       drop_last=True)
     # test_data_loader = DataLoader(my_test_dataset,

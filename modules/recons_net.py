@@ -26,6 +26,7 @@ class ReconsNet(nn.Module):
         else:
             self.recons_criterion_TV = None
         self.recons_weight = self.config['pregis_net']['recons_net']['recons_weight']
+        self.sim_weight = self.config['pregis_net']['recons_net']['sim_weight']
 
         # convolution to get mu and logvar
         self.conv11 = ConBnRelDp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
@@ -81,7 +82,9 @@ class ReconsNet(nn.Module):
         z = mu + std * esp
         return z
 
-    def calculate_vae_loss(self, input_image, target_image):
+    def calculate_vae_loss(self, input_image, target_image, current_epoch):
+        if current_epoch > 20:
+            self.network_mode = 'pregis'
         loss_dict = {}
         kld_element = self.mu.pow(2).add_(self.log_var.exp()).mul_(-1).add_(1).add_(self.log_var)
         kld_loss = torch.mean(kld_element).mul_(-0.5)
@@ -101,7 +104,7 @@ class ReconsNet(nn.Module):
         if self.network_mode == 'pregis':
             sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
             loss_dict['vae_sim_loss'] = sim_loss
-            all_vae_loss += sim_loss
+            all_vae_loss += self.sim_weight * sim_loss
 
         loss_dict['vae_all_loss'] = all_vae_loss
         return loss_dict

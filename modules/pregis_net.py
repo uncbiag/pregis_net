@@ -30,17 +30,17 @@ class PregisNet(nn.Module):
     #########################
     #  Calculate Loss functions
     #########################
-    def cal_pregis_loss(self, moving, target):
+    def cal_pregis_loss(self, moving, target, current_epoch):
         if self.network_mode == 'pregis':
             mermaid_loss = self.mermaid_net.cal_mermaid_loss(moving, target)
-            vae_loss = self.recons_net.calculate_vae_loss(self.warped_image, target)
+            vae_loss = self.recons_net.calculate_vae_loss(self.warped_image, target, current_epoch)
             all_loss = mermaid_loss['mermaid_all_loss'] + vae_loss['vae_all_loss']
             loss_dict = {**mermaid_loss, **vae_loss}
             loss_dict['all_loss'] = all_loss
         elif self.network_mode == 'mermaid':
             loss_dict = self.mermaid_net.cal_mermaid_loss(moving, target)
         elif self.network_mode == 'recons':
-            loss_dict = self.recons_net.calculate_vae_loss(moving, target)
+            loss_dict = self.recons_net.calculate_vae_loss(moving, target, current_epoch)
         else:
             raise ValueError("Network mode not correct")
 

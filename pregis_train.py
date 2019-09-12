@@ -236,7 +236,7 @@ class TrainPregis:
                 target_image = target_image.cuda()
 
                 self.pregis_net(moving_image, target_image)
-                loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image)
+                loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image, current_epoch)
                 if self.network_mode == 'pregis':
                     loss_dict['all_loss'].backward()
                 elif self.network_mode == 'mermaid':

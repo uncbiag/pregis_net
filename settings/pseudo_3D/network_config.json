@@ -16,7 +16,8 @@
                 "use_TV_loss": false,
                 "KLD_weight": 0.001,
                 "TV_weight": 0.1,
-                "recons_weight": 1
+                "recons_weight": 1,
+                "sim_weight": 0.1
             }
         }
     },

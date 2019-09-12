@@ -35,8 +35,8 @@ def weights_init(m):
         nn.init.constant_(m.bias.data, 0)
 
 
-def create_model(network_config):
-    model = PregisNet(network_config)
+def create_model(network_config, network_mode):
+    model = PregisNet(network_config, network_mode)
     model.cuda()
     model.apply(weights_init)
     return model

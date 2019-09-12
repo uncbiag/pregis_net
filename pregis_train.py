@@ -2,7 +2,7 @@ import os
 import datetime
 import json
 from utils.utils import *
-import glob
+import socket
 
 from tensorboardX import SummaryWriter
 from utils.visualize import make_image_summary
@@ -12,20 +12,33 @@ class TrainPregis:
 
     def __init__(self):
         self.dataset = 'pseudo_3D'
-        self.network_mode = 'recons'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
+        self.network_mode = 'pregis'
+
         self.time = None
 
+        # specify continue training or new training
         self.is_continue = False
+
+        #
+        self.root_folder = None
+        hostname = socket.gethostname()
+        if hostname == 'biag-gpu0.cs.unc.edu':
+            self.root_folder = '/playpen/xhs400/Research/pregis_net'
+        elif hostname == 'biag-w05.cs.unc.edu':
+            self.root_folder = '/playpen/xhs400/Research/PycharmProjects/pregis_net'
+        else:
+            raise ValueError("Wrong host! Please configure.")
+        assert(self.root_folder is not None)
 
         # set configuration file:
         self.network_config = None
         self.mermaid_config = None
         self.network_folder = None
         self.network_file = {}
-        self.network_config_file = {}
+        self.network_config_file = None
         self.mermaid_config_file = None
-        self.set_configuration_file()
+        self.__setup_configuration_file()
 
         # load models
         self.train_data_loader = None
@@ -33,85 +46,64 @@ class TrainPregis:
         self.pregis_net = None
         self.optimizer = None
         self.scheduler = None
-        self.load_models()
+        self.__load_models()
 
         self.log_folder = None
-        self.set_output_files()
+        self.__setup_output_files()
 
-    def set_configuration_file(self):
+    def __setup_configuration_file(self):
         if self.is_continue:
             # to continue, specify the model folder and model
             if self.network_mode == 'mermaid':
                 self.network_folder = ""
                 self.network_file['mermaid_net'] = os.path.join(self.network_folder, "")
-                self.network_config_file['mermaid_net'] = os.path.join(self.network_folder, 'mermaid_network_config.json')
+                self.network_config_file = os.path.join(self.network_folder, 'mermaid_network_config.json')
             if self.network_mode == 'recons':
-                self.network_folder = ""
-                self.network_file['recons_net'] = os.path.join(self.network_folder, "")
-                self.network_config_file['recons_net'] = os.path.join(self.network_folder, 'recons_network_config.json')
+                self.network_folder = os.path.join(self.root_folder,
+                                                   'tmp_models/recons_net',
+                                                   'model_recons_time_20190911-115036_initLR_0.0005_kld_0.001_recons_1_useTV_False_tv_0.1')
+                self.network_file['recons_net'] = os.path.join(self.network_folder, "eval_2.pth.tar")
+                self.network_config_file = os.path.join(self.network_folder, 'recons_network_config.json')
             if self.network_mode == 'pregis':
                 self.network_folder = ""
                 self.network_file['pregis_net'] = os.path.join(self.network_folder, "")
-                self.network_config_file['mermaid_net'] = os.path.join(self.network_folder, 'mermaid_network_config.json')
-                self.network_config_file['recons_net'] = os.path.join(self.network_folder, 'recons_network_config.json')
+                self.network_config_file = os.path.join(self.network_folder, 'pregis_network_config.json')
 
             self.mermaid_config_file = os.path.join(self.network_folder, 'mermaid_config.json')
         else:
-            # get network configure file from setting folder
-            # two subnetworks and one for shooting
-            if self.network_mode == 'mermaid':
-                self.network_config_file['mermaid_net'] = os.path.join(os.path.dirname(__file__),
-                                                                       "settings/{}/network_config.json".format(self.dataset))
-            if self.network_mode == 'recons':
-                self.network_config_file['recons_net'] = os.path.join(os.path.dirname(__file__),
-                                                                      "settings/{}/network_config.json".format(self.dataset))
+            self.network_config_file = os.path.join(os.path.dirname(__file__),
+                                                    "settings/{}/network_config.json".format(self.dataset))
 
             self.mermaid_config_file = os.path.join(os.path.dirname(__file__),
                                                "settings/{}/mermaid_config.json".format(self.dataset))
             if self.network_mode == 'pregis':
                 # needs to specify which mermaid net and recons net pretrained model to load
                 # otherwise load from scratch
-                mermaid_net_folder = ""
-                if mermaid_net_folder == "":
-                    self.network_config_file['mermaid_net'] = os.path.join(os.path.dirname(__file__),
-                                                                           "settings/{}/network_config.json".format(self.dataset))
-                else:
-                    self.network_config_file['mermaid_net'] = os.path.join(mermaid_net_folder, 'mermaid_network_config.json')
-                    self.network_file['mermaid_net'] = os.path.join(mermaid_net_folder, "")
-                    self.mermaid_config_file = os.path.join(mermaid_net_folder, 'mermaid_config.json')
+                mermaid_net_folder = os.path.join(self.root_folder, 'tmp_models/mermaid_net',
+                                                  "model_mermaid_time_20190911-160624_initLR_0.0005_sigma_1.732")
+                if mermaid_net_folder != "":
+                    self.network_file['mermaid_net'] = os.path.join(mermaid_net_folder, "eval_1.pth.tar")
+                    assert(os.path.isfile(self.network_file['mermaid_net']))
 
-                recons_net_folder = ""
-                if recons_net_folder == "":
-                    self.network_config_file['recons_net'] = os.path.join(os.path.dirname(__file__),
-                                                                          "settings/{}/network_config.json".format(self.dataset))
-                else:
-                    self.network_config_file['recons_net'] = os.path.join(recons_net_folder, 'recons_network_config.json')
-                    self.network_file['recons_net'] = os.path.join(recons_net_folder, "")
+                recons_net_folder = os.path.join(self.root_folder, 'tmp_models/recons_net',
+                                                 "model_recons_time_20190911-115036_initLR_0.0005_kld_0.001_recons_1_useTV_False_tv_0.1")
+                if recons_net_folder != "":
+                    self.network_file['recons_net'] = os.path.join(recons_net_folder, "eval_2.pth.tar")
+                    assert(os.path.isfile(self.network_file['recons_net']))
 
-        if self.network_mode == 'mermaid':
-            with open(self.network_config_file['mermaid_net']) as f:
-                self.network_config = json.load(f)
-        elif self.network_mode == 'recons':
-            with open(self.network_config_file['recons_net']) as f:
-                self.network_config = json.load(f)
-        elif self.network_mode == 'pregis':
-            with open(self.network_config_file['recons_net']) as f:
-                recons_net_config = json.load(f)
-            with open(self.network_config_file['mermaid_net']) as f:
-                mermaid_net_config = json.load(f)
-            self.network_config = mermaid_net_config
-            self.network_config['pregis_net']['recons_net'] = recons_net_config['pregis_net']['recons_net']
+        with open(self.network_config_file) as f:
+            self.network_config = json.load(f)
 
         with open(self.mermaid_config_file) as f:
             self.mermaid_config = json.load(f)
         self.network_config['model']['mermaid_config_file'] = self.mermaid_config_file
 
-    def load_models(self):
+    def __load_models(self):
         train_config = self.network_config['train']
 
         self.train_data_loader, self.validate_data_loader = \
             create_dataloader(self.network_config['model'], train_config, self.network_mode)
-        self.pregis_net = create_model(self.network_config['model'])
+        self.pregis_net = create_model(self.network_config['model'], self.network_mode)
         self.pregis_net.network_mode = self.network_mode
 
         if self.network_mode == 'pregis':
@@ -123,7 +115,7 @@ class TrainPregis:
         else:
             raise ValueError("Wrong network mode")
 
-    def set_output_files(self):
+    def __setup_output_files(self):
         # Setup output locations, names, etc.
         if not self.is_continue:
             now = datetime.datetime.now()
@@ -157,12 +149,15 @@ class TrainPregis:
                                                '{}_net'.format(self.network_mode),
                                                my_name)
             os.system('mkdir -p ' + self.network_folder)
-            if 'mermaid_net' in self.network_config_file:
-                print("Writing {} to {}".format(self.network_config_file['mermaid_net'], os.path.join(self.network_folder, 'mermaid_network_config.json')))
-                os.system('cp ' + self.network_config_file['mermaid_net'] + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
-            if 'recons_net' in self.network_config_file:
-                print("Writing {} to {}".format(self.network_config_file['recons_net'], os.path.join(self.network_folder, 'recons_network_config.json')))
-                os.system('cp ' + self.network_config_file['recons_net'] + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
+            if self.network_mode == 'mermaid':
+                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'mermaid_network_config.json')))
+                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
+            if self.network_mode == 'recons':
+                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'recons_network_config.json')))
+                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
+            if self.network_mode == 'pregis':
+                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'pregis_network_config.json')))
+                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'pregis_network_config.json'))
             print("Writing {} to {}".format(self.mermaid_config_file, os.path.join(self.network_folder, 'mermaid_config.json')))
             os.system('cp ' + self.mermaid_config_file + ' ' + os.path.join(self.network_folder, 'mermaid_config.json'))
 
@@ -194,21 +189,29 @@ class TrainPregis:
         writer = SummaryWriter(self.log_folder)
 
         if self.network_file:
-            # resume training
-            # TODO
-            if os.path.isfile(self.network_file):
-                checkpoint = torch.load(self.network_file)
-                if 'epoch' in checkpoint:
+            # resume training or loading mermaid and recons net for pregis net training
+
+            for model_name in self.network_file:
+                model_file = self.network_file[model_name]
+                checkpoint = torch.load(model_file)
+                if 'epoch' in checkpoint and model_name == self.network_mode + "_net":
                     current_epoch = checkpoint['epoch'] + 1
-                try:
-                    self.network_file.load_state_dict(checkpoint['model_state_dict'])
-                except:
-                    print("Model load FAILED")
-                if 'optimizer_state_dict' in checkpoint and self.optimizer is not None:
+                if 'optimizer_state_dict' in checkpoint and model_name == self.network_mode + "_net":
                     self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                try:
+                    if model_name == 'pregis_net':
+                        self.pregis_net.load_state_dict(checkpoint['model_state_dict'])
+                        break
+                    if model_name == 'mermaid_net':
+                        self.pregis_net.mermaid_net.load_state_dict(checkpoint['model_state_dict'])
+                    if model_name == 'recons_net':
+                        self.pregis_net.recons_net.load_state_dict(checkpoint['model_state_dict'])
+                except:
+                    print("Model load FAILED!!!!")
 
         min_val_loss = 0.0
 
+        print("Current epoch: {}".format(current_epoch))
         while current_epoch < n_epochs:
             epoch_loss_dict = {
                 'mermaid_all_loss': 0.0,

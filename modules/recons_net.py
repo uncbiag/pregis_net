@@ -9,9 +9,10 @@ import pyreg.similarity_measure_factory as smf
 
 
 class ReconsNet(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, model_config, network_mode):
         super(ReconsNet, self).__init__()
         self.config = model_config
+        self.network_mode = network_mode
 
         use_bn = self.config['pregis_net']['recons_net']['bn']
         use_dp = self.config['pregis_net']['recons_net']['dp']
@@ -96,10 +97,12 @@ class ReconsNet(nn.Module):
             recons_loss = recons_loss_11
         loss_dict['vae_recons_loss'] = recons_loss
 
-        #sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
-        #loss_dict['vae_sim_loss'] = sim_loss
+        all_vae_loss = self.KLD_weight * kld_loss + self.recons_weight * recons_loss
+        if self.network_mode == 'pregis':
+            sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
+            loss_dict['vae_sim_loss'] = sim_loss
+            all_vae_loss += sim_loss
 
-        all_vae_loss = self.KLD_weight * kld_loss + self.recons_weight * recons_loss # + sim_loss
         loss_dict['vae_all_loss'] = all_vae_loss
         return loss_dict
 

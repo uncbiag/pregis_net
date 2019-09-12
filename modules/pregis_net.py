@@ -9,13 +9,17 @@ from modules.recons_net import ReconsNet
 
 
 class PregisNet(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, model_config, network_mode):
         super(PregisNet, self).__init__()
-        self.mermaid_net = MermaidNet(model_config)
-        self.recons_net = ReconsNet(model_config)
+        self.mermaid_net = None
+        self.recons_net = None
+        self.network_mode = network_mode
 
-        # mode needs to be set after initialization
-        self.network_mode = None
+        if self.network_mode in ['mermaid', 'pregis']:
+            self.mermaid_net = MermaidNet(model_config, network_mode)
+        if self.network_mode in ['recons', 'pregis']:
+            self.recons_net = ReconsNet(model_config, network_mode)
+
         # results
         self.warped_image = None
         self.phi = None
@@ -29,7 +33,7 @@ class PregisNet(nn.Module):
     def cal_pregis_loss(self, moving, target):
         if self.network_mode == 'pregis':
             mermaid_loss = self.mermaid_net.cal_mermaid_loss(moving, target)
-            vae_loss = self.recons_net.calculate_vae_loss(self.warped, target)
+            vae_loss = self.recons_net.calculate_vae_loss(self.warped_image, target)
             all_loss = mermaid_loss['mermaid_all_loss'] + vae_loss['vae_all_loss']
             loss_dict = {**mermaid_loss, **vae_loss}
             loss_dict['all_loss'] = all_loss

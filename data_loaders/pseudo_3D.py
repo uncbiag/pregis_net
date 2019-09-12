@@ -8,6 +8,7 @@ import progressbar as pb
 import blosc
 import multiprocessing
 import socket
+
 blosc.set_nthreads(1)
 
 
@@ -15,7 +16,7 @@ class Pseudo3DDataset(Dataset):
     def __init__(self, dataset_mode='training', network_mode='pregis'):
 
         root_folder = self.__set_root_folder()
-        assert(root_folder is not None)
+        assert (root_folder is not None)
         self.num_of_workers = 12
         oasis_affined_folder = os.path.join(root_folder, 'oasis_3', 'affined')
         oasis_brain_folder = os.path.join(oasis_affined_folder, 'normalized', 'pseudo_not_used')
@@ -52,6 +53,21 @@ class Pseudo3DDataset(Dataset):
         image_io = py_fio.ImageIO()
         self.atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
 
+        self.images_dict = None
+        self.__multi_threads_loading()
+
+        return
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        image_name = self.image_files[idx]
+        image_compressed = self.images_dict[image_name]
+        image = blosc.unpack_array(image_compressed)
+        return image[0, ...], self.atlas[0, ...]
+
+    def __multi_threads_loading(self):
         manager = multiprocessing.Manager()
         self.images_dict = manager.dict()
         split_list = self.__split_image_files()
@@ -63,17 +79,8 @@ class Pseudo3DDataset(Dataset):
 
         for p in process:
             p.join()
+        self.images_dict = dict(self.images_dict)
         print("Finish loading images")
-        return
-
-    def __len__(self):
-        return len(self.image_files)
-
-    def __getitem__(self, idx):
-        image_name = self.image_files[idx]
-        image_compressed = self.images_dict[image_name]
-        image = blosc.unpack_array(image_compressed)
-        return image[0, ...], self.atlas[0, ...]
 
     def __split_image_files(self):
         index_list = list(range(len(self.image_files)))
@@ -96,7 +103,6 @@ class Pseudo3DDataset(Dataset):
             count += 1
             pbar.update(count)
         pbar.finish()
-
 
     def __set_root_folder(self):
         hostname = socket.gethostname()

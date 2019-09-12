@@ -16,9 +16,10 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
 
 
 class MermaidNet(nn.Module):
-    def __init__(self, model_config):
+    def __init__(self, model_config, network_mode):
         super(MermaidNet, self).__init__()
         self.config = model_config
+        self.network_mode = network_mode
         bn = self.config['pregis_net']['mermaid_net']['bn']
         dp = self.config['pregis_net']['mermaid_net']['dp']
         dim = self.config['dim']
@@ -87,7 +88,7 @@ class MermaidNet(nn.Module):
     def cal_mermaid_loss(self, moving, target):
         loss_dict = {}
         batch_size = moving.size(0)
-        mermaid_all_loss, \
+        _, \
         mermaid_sim_loss, \
         mermaid_reg_loss = self.mermaid_criterion(phi0=self.identityMap,
                                                   phi1=self.phi,
@@ -96,6 +97,10 @@ class MermaidNet(nn.Module):
                                                   lowres_I0=None,
                                                   variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
                                                   variables_from_optimizer=None)
+
+        mermaid_all_loss = mermaid_reg_loss
+        if self.network_mode == 'mermaid':
+            mermaid_all_loss += mermaid_sim_loss
 
         loss_dict['mermaid_all_loss'] = mermaid_all_loss / batch_size
         loss_dict['mermaid_sim_loss'] = mermaid_sim_loss / batch_size

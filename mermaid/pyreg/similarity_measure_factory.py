@@ -49,7 +49,7 @@ class SimilarityMeasure(with_metaclass(ABCMeta, object)):
         :return: returns similarity measure
         """
         sz = I0.size()
-        sim = torch.zeros(1).type_as(I0)
+        sim = 0.
 
         if I0Source is None and phi is None:
             for nrI in range(sz[0]):  # loop over all the images
@@ -81,7 +81,7 @@ class SimilarityMeasure(with_metaclass(ABCMeta, object)):
         :return: returns similarity measure
         """
         sz = I0.size()
-        sim = torch.zeros(1).type_as(I0)
+        sim = 0.
 
         if I0Source is None:
             for nrC in range(sz[
@@ -541,6 +541,9 @@ class LNCCSimilarity(SimilarityMeasure):
 
             lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
             torch.clamp(lncc, 0, 1)
+            if torch.max(lncc) > 1 or torch.min(lncc) < 0:
+                print(torch.max(lncc))
+                print(torch.min(lncc))
             lncc = 1 - lncc.mean()
             lncc_total += lncc * self.weight[scale_id]
 

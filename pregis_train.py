@@ -29,7 +29,7 @@ class TrainPregis:
             self.root_folder = '/playpen/xhs400/Research/PycharmProjects/pregis_net'
         else:
             raise ValueError("Wrong host! Please configure.")
-        assert(self.root_folder is not None)
+        assert (self.root_folder is not None)
 
         # set configuration file:
         self.network_config = None
@@ -75,7 +75,7 @@ class TrainPregis:
                                                     "settings/{}/network_config.json".format(self.dataset))
 
             self.mermaid_config_file = os.path.join(os.path.dirname(__file__),
-                                               "settings/{}/mermaid_config.json".format(self.dataset))
+                                                    "settings/{}/mermaid_config.json".format(self.dataset))
             if self.network_mode == 'pregis':
                 # needs to specify which mermaid net and recons net pretrained model to load
                 # otherwise load from scratch
@@ -83,13 +83,13 @@ class TrainPregis:
                                                   "model_mermaid_time_20190911-160624_initLR_0.0005_sigma_1.732")
                 if mermaid_net_folder != "":
                     self.network_file['mermaid_net'] = os.path.join(mermaid_net_folder, "eval_1.pth.tar")
-                    assert(os.path.isfile(self.network_file['mermaid_net']))
+                    assert (os.path.isfile(self.network_file['mermaid_net']))
 
                 recons_net_folder = os.path.join(self.root_folder, 'tmp_models/recons_net',
                                                  "model_recons_time_20190911-115036_initLR_0.0005_kld_0.001_recons_1_useTV_False_tv_0.1")
                 if recons_net_folder != "":
                     self.network_file['recons_net'] = os.path.join(recons_net_folder, "eval_2.pth.tar")
-                    assert(os.path.isfile(self.network_file['recons_net']))
+                    assert (os.path.isfile(self.network_file['recons_net']))
 
         with open(self.network_config_file) as f:
             self.network_config = json.load(f)
@@ -117,60 +117,61 @@ class TrainPregis:
 
     def __setup_output_files(self):
         # Setup output locations, names, etc.
-        if not self.is_continue:
-            now = datetime.datetime.now()
-            # distinct time stamp for each model
-            time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year,
-                                                                  now.month,
-                                                                  now.day,
-                                                                  now.hour,
-                                                                  now.minute,
-                                                                  now.second)
-            init_lr = self.network_config['train']['optimizer']['lr']
-            my_name = "model_{}_time_{}_initLR_{}".format(self.network_mode, time, init_lr)
-            sigma = self.mermaid_config['model']['registration_model']['similarity_measure']['sigma']
-            if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
-                my_name = my_name + '_sigma_{}'.format(sigma)
+        now = datetime.datetime.now()
+        # distinct time stamp for each model
+        time = "{:04d}{:02d}{:02d}-{:02d}{:02d}{:02d}".format(now.year,
+                                                              now.month,
+                                                              now.day,
+                                                              now.hour,
+                                                              now.minute,
+                                                              now.second)
+        init_lr = self.network_config['train']['optimizer']['lr']
+        my_name = "model_{}_time_{}_initLR_{}".format(self.network_mode, time, init_lr)
+        sigma = self.mermaid_config['model']['registration_model']['similarity_measure']['sigma']
+        if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
+            my_name = my_name + '_sigma_{}'.format(sigma)
 
-            if self.network_mode == 'recons' or self.network_mode == 'pregis':
-                print(self.network_config)
-                use_tv_loss = self.network_config['model']['pregis_net']['recons_net']['use_TV_loss']
+        if self.network_mode == 'recons' or self.network_mode == 'pregis':
+            print(self.network_config)
+            use_tv_loss = self.network_config['model']['pregis_net']['recons_net']['use_TV_loss']
 
-                kld_weight = self.network_config['model']['pregis_net']['recons_net']['KLD_weight']
-                tv_weight = self.network_config['model']['pregis_net']['recons_net']['TV_weight']
-                recons_weight = self.network_config['model']['pregis_net']['recons_net']['recons_weight']
-                sim_weight = self.network_config['model']['pregis_net']['recons_net']['sim_weight']
-                my_name = my_name + '_kld_{}_recons_{}_sim_{}_useTV_{}_tv_{}'.format(kld_weight,
-                                                                              recons_weight,
-                                                                              sim_weight,
-                                                                              use_tv_loss,
-                                                                              tv_weight)
+            kld_weight = self.network_config['model']['pregis_net']['recons_net']['KLD_weight']
+            tv_weight = self.network_config['model']['pregis_net']['recons_net']['TV_weight']
+            recons_weight = self.network_config['model']['pregis_net']['recons_net']['recons_weight']
+            sim_weight = self.network_config['model']['pregis_net']['recons_net']['sim_weight']
+            my_name = my_name + '_kld_{}_recons_{}_sim_{}_useTV_{}_tv_{}'.format(kld_weight,
+                                                                                 recons_weight,
+                                                                                 sim_weight,
+                                                                                 use_tv_loss,
+                                                                                 tv_weight)
 
-            self.network_folder = os.path.join(os.path.dirname(__file__),
-                                               'tmp_models',
-                                               '{}_net'.format(self.network_mode),
-                                               my_name)
-            os.system('mkdir -p ' + self.network_folder)
-            if self.network_mode == 'mermaid':
-                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'mermaid_network_config.json')))
-                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
-            if self.network_mode == 'recons':
-                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'recons_network_config.json')))
-                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'recons_network_config.json'))
-            if self.network_mode == 'pregis':
-                print("Writing {} to {}".format(self.network_config_file, os.path.join(self.network_folder, 'pregis_network_config.json')))
-                os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder, 'pregis_network_config.json'))
-            print("Writing {} to {}".format(self.mermaid_config_file, os.path.join(self.network_folder, 'mermaid_config.json')))
-            os.system('cp ' + self.mermaid_config_file + ' ' + os.path.join(self.network_folder, 'mermaid_config.json'))
-
-            self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', '{}_net'.format(self.network_mode),
+        self.network_folder = os.path.join(os.path.dirname(__file__),
+                                           'tmp_models',
+                                           '{}_net'.format(self.network_mode),
                                            my_name)
-            os.system('mkdir -p ' + self.log_folder)
-        else:
-            my_name = self.network_folder.split('/')[-1]
-            self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', '{}_net'.format(self.network_mode),
-                                           my_name)
+        os.system('mkdir -p ' + self.network_folder)
+        if self.network_mode == 'mermaid':
+            print("Writing {} to {}".format(self.network_config_file,
+                                            os.path.join(self.network_folder, 'mermaid_network_config.json')))
+            os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder,
+                                                                            'recons_network_config.json'))
+        if self.network_mode == 'recons':
+            print("Writing {} to {}".format(self.network_config_file,
+                                            os.path.join(self.network_folder, 'recons_network_config.json')))
+            os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder,
+                                                                            'recons_network_config.json'))
+        if self.network_mode == 'pregis':
+            print("Writing {} to {}".format(self.network_config_file,
+                                            os.path.join(self.network_folder, 'pregis_network_config.json')))
+            os.system('cp ' + self.network_config_file + ' ' + os.path.join(self.network_folder,
+                                                                            'pregis_network_config.json'))
+        print("Writing {} to {}".format(self.mermaid_config_file,
+                                        os.path.join(self.network_folder, 'mermaid_config.json')))
+        os.system('cp ' + self.mermaid_config_file + ' ' + os.path.join(self.network_folder, 'mermaid_config.json'))
 
+        self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', '{}_net'.format(self.network_mode),
+                                       my_name)
+        os.system('mkdir -p ' + self.log_folder)
         return
 
     def train_model(self):
@@ -246,7 +247,7 @@ class TrainPregis:
                 elif self.network_mode == 'recons':
                     loss_dict['vae_all_loss'].backward()
                 else:
-                    raise  ValueError("Wrong network_mode")
+                    raise ValueError("Wrong network_mode")
 
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 self.optimizer.step()
@@ -256,7 +257,7 @@ class TrainPregis:
                         epoch_loss_dict[loss_key] += loss_dict[loss_key].item()
 
                 if (i + 1) % summary_batch_period == 0:  # print summary every k batches
-                    to_print = "====>{:0d}, {:0d}".format(current_epoch+1, global_step)
+                    to_print = "====>{:0d}, {:0d}".format(current_epoch + 1, global_step)
 
                     for loss_key in epoch_loss_dict:
                         writer.add_scalar('training/training_{}'.format(loss_key),
@@ -389,8 +390,7 @@ class TrainPregis:
                                     'optimizer_state_dict': self.optimizer.state_dict()},
                                    save_file)
                     else:
-                        raise  ValueError("Wrong Mode")
-
+                        raise ValueError("Wrong Mode")
 
             current_epoch = current_epoch + 1
 

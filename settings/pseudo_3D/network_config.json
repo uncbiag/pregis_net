@@ -26,10 +26,10 @@
     "train":{
         "n_of_epochs":100,
         "batch_size":4,
-        "min_summary_period":15,
+        "min_summary_period":1,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.001,
+            "lr": 0.0005,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [

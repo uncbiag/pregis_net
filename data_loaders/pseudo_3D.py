@@ -17,7 +17,7 @@ class Pseudo3DDataset(Dataset):
 
         root_folder = self.__set_root_folder()
         assert (root_folder is not None)
-        self.num_of_workers = 12
+        self.num_of_workers = 20
         oasis_affined_folder = os.path.join(root_folder, 'oasis_3', 'affined')
         oasis_brain_folder = os.path.join(oasis_affined_folder, 'normalized', 'pseudo_not_used')
 

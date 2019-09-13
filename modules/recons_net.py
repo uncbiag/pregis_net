@@ -34,41 +34,32 @@ class ReconsNet(nn.Module):
         # convolution to get mu and logvar
         #self.conv11 = ConBnRelDp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
         #self.conv12 = ConBnRelDp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
-        self.fc11 = nn.Linear(6*6*6*8, 512)
-        self.fc12 = nn.Linear(6*6*6*8, 512)
+        self.fc11 = nn.Linear(12*12*12*8, 512)
+        self.fc12 = nn.Linear(12*12*12*8, 512)
 
-        self.fc2 = nn.Linear(512, 6*6*6*8)
+        self.fc2 = nn.Linear(512, 12*12*12*8)
 
         self.encoder = nn.Sequential(
             ConBnRelDp(2, 8, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn,use_dp=use_dp),
             ConBnRelDp(8, 16, kernel_size=3, stride=2, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             ConBnRelDp(16, 32, kernel_size=3, stride=2, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
-            ConBnRelDp(32, 32, kernel_size=3, stride=2, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             ConBnRelDp(32, 16, kernel_size=3, stride=2, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             ConBnRelDp(16, 8, kernel_size=3, stride=2, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp)
         )
 
         self.decoder = nn.Sequential(
-            ConBnRelDp(8, 16, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
-            #nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False),
-            ConBnRelDp(16, 32, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
-            #nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False),
+            ConBnRelDp(8, 16, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(16, 16, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
             ConBnRelDp(32, 32, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
-            #nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False),
-            ConBnRelDp(32, 16, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
-            #nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False),
-            ConBnRelDp(16, 8, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True),
-            #nn.Upsample(scale_factor=2, mode='trilinear', align_corners=False),
+            ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(32, 32, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(16, 16, kernel_size=2, stride=2, dim=dim, activate_unit='leaky_relu', reverse=True, use_bn=use_bn, use_dp=use_dp),
+            ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=dim, activate_unit='None', same_padding=True),
             ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=dim, activate_unit='None', same_padding=True),
             nn.Sigmoid()
-            #ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
-            #ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
-            #ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
-            #ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
-            #ConBnRelDp(32, 16, kernel_size=2, stride=2, dim=dim, reverse=True, activate_unit='leaky_relu', use_bn=use_bn, use_dp=use_dp),
-            #ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
-            #ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
-            #nn.Sigmoid()
         )
 
         self.img_sz = self.config['img_sz']
@@ -88,11 +79,11 @@ class ReconsNet(nn.Module):
         return
 
     def encode(self, x1, x2):
-        x = self.encoder(torch.cat((x1, x2), dim=1)).view(-1, 6*6*6*8)
+        x = self.encoder(torch.cat((x1, x2), dim=1)).view(-1, 12*12*12*8)
         return self.fc11(x), self.fc12(x)
 
     def decode(self, z):
-        x = self.fc2(z).view(-1, 8, 6, 6, 6)
+        x = self.fc2(z).view(-1, 8, 12, 12, 12)
         return self.decoder(x)
 
     def reparameterize(self, mu, log_var):
@@ -102,15 +93,15 @@ class ReconsNet(nn.Module):
         return z
 
     def calculate_vae_loss(self, input_image, target_image, current_epoch):
-        if current_epoch > self.mode_change_epoch:
-            self.network_mode = 'pregis'
+        #if current_epoch > self.mode_change_epoch:
+        #    self.network_mode = 'pregis'
         loss_dict = {}
         kld_element = self.mu.pow(2).add_(self.log_var.exp()).mul_(-1).add_(1).add_(self.log_var)
         kld_loss = torch.sum(kld_element).mul_(-0.5)
         loss_dict['vae_kld_loss'] = kld_loss
 
         recons_loss_11 = self.recons_criterion_L1(self.recons_image, input_image)
-        loss_dict['recons_loss_l1']  = recons_loss_11
+        loss_dict['recons_loss_l1'] = recons_loss_11
         if self.recons_criterion_TV is not None:
             recons_loss_tv = self.recons_criterion_TV(self.recons_image, input_image)
             loss_dict['recons_loss_TV'] = recons_loss_tv
@@ -119,11 +110,11 @@ class ReconsNet(nn.Module):
             recons_loss = recons_loss_11
         loss_dict['vae_recons_loss'] = recons_loss
 
-        all_vae_loss = self.recons_weight * recons_loss
-        if self.network_mode == 'pregis':
-            sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
-            loss_dict['vae_sim_loss'] = sim_loss
-            all_vae_loss += self.sim_weight * sim_loss
+        all_vae_loss = self.KLD_weight * kld_loss + self.recons_weight * recons_loss
+        #if self.network_mode == 'pregis':
+        #    sim_loss = self.sim_criterion.compute_similarity_multiNC(self.recons_image, target_image)
+        #    loss_dict['vae_sim_loss'] = sim_loss
+        #    all_vae_loss += self.sim_weight * sim_loss
 
         loss_dict['vae_all_loss'] = all_vae_loss
         return loss_dict
@@ -132,8 +123,8 @@ class ReconsNet(nn.Module):
         self.mu, self.log_var = self.encode(input_image, target_image)
         z = self.reparameterize(self.mu, self.log_var)
         self.recons_image = self.decode(z)
-        self.diff_image = input_image - self.recons_image
-        return self.recons_image, self.diff_image
+        diff_image = input_image - self.recons_image.detach()
+        return self.recons_image, diff_image
 
 
 

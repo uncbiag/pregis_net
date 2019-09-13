@@ -15,7 +15,7 @@
                 "dp": false,
                 "dp_p": 0.2,
                 "use_TV_loss": false,
-                "KLD_weight": 0.001,
+                "KLD_weight": 0.01,
                 "TV_weight": 0.1,
                 "recons_weight": 1,
                 "sim_weight": 0.1,
@@ -29,7 +29,7 @@
         "min_summary_period":1,
         "optimizer":{
             "name": "ADAM",
-            "lr": 0.0005,
+            "lr": 0.001,
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [

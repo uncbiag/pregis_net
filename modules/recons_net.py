@@ -34,10 +34,12 @@ class ReconsNet(nn.Module):
         # convolution to get mu and logvar
         #self.conv11 = ConBnRelDp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
         #self.conv12 = ConBnRelDp(64, 128, kernel_size=3, stride=2, dim=dim, activate_unit='None', same_padding=True)
-        self.fc11 = nn.Linear(12*12*12*8, 512)
-        self.fc12 = nn.Linear(12*12*12*8, 512)
+        self.fc1 = nn.Linear(12*12*12*8, 512)
+        self.fc21 = nn.Linear(512, 512)
+        self.fc22 = nn.Linear(512, 512)
 
-        self.fc2 = nn.Linear(512, 12*12*12*8)
+        self.fc3 = nn.Linear(512, 512)
+        self.fc4 = nn.Linear(512, 12*12*12*8)
 
         self.encoder = nn.Sequential(
             ConBnRelDp(2, 8, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn,use_dp=use_dp),
@@ -62,6 +64,8 @@ class ReconsNet(nn.Module):
             nn.Sigmoid()
         )
 
+        self.relu = nn.ReLU()
+
         self.img_sz = self.config['img_sz']
         self.mermaid_config_file = model_config['mermaid_config_file']
         self.spacing = 1. / (np.array(self.img_sz[2:]) - 1)
@@ -71,6 +75,7 @@ class ReconsNet(nn.Module):
         sm_factory = smf.SimilarityMeasureFactory(self.spacing)
         self.sim_criterion = sm_factory.create_similarity_measure(params['model']['registration_model'])
 
+        self.relu = nn.ReLU(inplace=True)
         # results
         self.mu = None
         self.log_var = None
@@ -79,11 +84,13 @@ class ReconsNet(nn.Module):
         return
 
     def encode(self, x1, x2):
-        x = self.encoder(torch.cat((x1, x2), dim=1)).view(-1, 12*12*12*8)
-        return self.fc11(x), self.fc12(x)
+        conv = self.encoder(torch.cat((x1, x2), dim=1)).view(-1, 12*12*12*8)
+        x = self.relu(self.fc1(conv))
+        return self.fc21(x), self.fc22(x)
 
     def decode(self, z):
-        x = self.fc2(z).view(-1, 8, 12, 12, 12)
+        fc3 = self.relu(self.fc3(z))
+        x = self.relu(self.fc4(fc3)).view(-1, 8, 12, 12, 12)
         return self.decoder(x)
 
     def reparameterize(self, mu, log_var):
@@ -97,7 +104,7 @@ class ReconsNet(nn.Module):
         #    self.network_mode = 'pregis'
         loss_dict = {}
         kld_element = self.mu.pow(2).add_(self.log_var.exp()).mul_(-1).add_(1).add_(self.log_var)
-        kld_loss = torch.sum(kld_element).mul_(-0.5)
+        kld_loss = torch.mean(kld_element).mul_(-0.5)
         loss_dict['vae_kld_loss'] = kld_loss
 
         recons_loss_11 = self.recons_criterion_L1(self.recons_image, input_image)

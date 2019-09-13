@@ -13,6 +13,7 @@ class ReconsNet(nn.Module):
         super(ReconsNet, self).__init__()
         self.config = model_config
         self.network_mode = network_mode
+        print("ReconsNet Mode: {}".format(self.network_mode))
 
         use_bn = self.config['pregis_net']['recons_net']['bn']
         use_dp = self.config['pregis_net']['recons_net']['dp']
@@ -44,19 +45,19 @@ class ReconsNet(nn.Module):
             ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=dim, activate_unit='leaky_relu', same_padding=True, use_bn=use_bn, use_dp=use_dp),
         )
         self.decoder = nn.Sequential(
-            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu',
                        same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu',
                        same_padding=True, use_bn=use_bn, use_dp=use_dp),
-            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu',
                        use_bn=use_bn, use_dp=use_dp),
+            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu',
                        same_padding=True, use_bn=use_bn, use_dp=use_dp),
-            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='leaky_relu',
                        same_padding=True, use_bn=use_bn, use_dp=use_dp),
+            nn.Upsample(scale_factor=2, mode='trilinear', align_corners=True),
             ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
             ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=dim, reverse=False, activate_unit='None', same_padding=True),
             nn.Sigmoid()

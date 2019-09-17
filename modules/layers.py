@@ -3,7 +3,7 @@ import torch.nn as nn
 
 
 class MaxPool(nn.Module):
-    def __init__(self, kernel_size=2, dim=3):
+    def __init__(self, kernel_size=2, dim=3, return_indieces=False):
         super(MaxPool, self).__init__()
         if dim == 1:
             max_pool = nn.MaxPool1d
@@ -14,11 +14,30 @@ class MaxPool(nn.Module):
         else:
             raise ValueError("Dimension error")
 
-        self.max_pool = max_pool(kernel_size)
+        self.max_pool = max_pool(kernel_size, stride=2, return_indices=return_indieces)
         return
 
     def forward(self, x):
         return self.max_pool(x)
+
+
+class MaxUnpool(nn.Module):
+    def __init__(self, kernel_size=2, dim=3):
+        super(MaxUnpool, self).__init__()
+        if dim == 1:
+            max_unpool = nn.MaxUnpool1d
+        elif dim == 2:
+            max_unpool = nn.MaxUnpool2d
+        elif dim == 3:
+            max_unpool = nn.MaxUnpool3d
+        else:
+            raise ValueError("Dimension Error")
+
+        self.max_unpool = max_unpool(kernel_size=kernel_size, stride=2)
+        return
+
+    def forward(self, x, indices):
+        return self.max_unpool(x, indices)
 
 
 class ConBnRelDp(nn.Module):
@@ -55,7 +74,7 @@ class ConBnRelDp(nn.Module):
         elif activate_unit == 'elu':
             self.activate_unit = nn.ELU(inplace=True)
         elif activate_unit == 'leaky_relu':
-            self.activate_unit = nn.LeakyReLU(inplace=True)
+            self.activate_unit = nn.LeakyReLU(negative_slope=0.2, inplace=True)
         else:
             self.activate_unit = False
         self.drop_out = drop_out(0.2) if use_dp else False

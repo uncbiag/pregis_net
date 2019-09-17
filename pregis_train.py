@@ -11,9 +11,9 @@ from utils.visualize import make_image_summary
 class TrainPregis:
 
     def __init__(self):
-        self.dataset = 'pseudo_3D'
+        self.dataset = 'pseudo_2D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
-        self.network_mode = 'recons'
+        self.network_mode = 'mermaid'
 
         self.time = None
 
@@ -43,6 +43,7 @@ class TrainPregis:
         # load models
         self.train_data_loader = None
         self.validate_data_loader = None
+        self.tumor_data_loader = None
         self.pregis_net = None
         self.optimizer = None
         self.scheduler = None
@@ -61,8 +62,8 @@ class TrainPregis:
             if self.network_mode == 'recons':
                 self.network_folder = os.path.join(self.root_folder,
                                                    'tmp_models/recons_net',
-                                                   'model_recons_time_20190911-115036_initLR_0.0005_kld_0.001_recons_1_useTV_False_tv_0.1')
-                self.network_file['recons_net'] = os.path.join(self.network_folder, "eval_2.pth.tar")
+                                                   'model_recons_time_20190913-163436_initLR_0.0005_kld_0.01_recons_1_sim_0.1_useTV_False_tv_0.1')
+                self.network_file['recons_net'] = os.path.join(self.network_folder, "eval_99.pth.tar")
                 self.network_config_file = os.path.join(self.network_folder, 'recons_network_config.json')
             if self.network_mode == 'pregis':
                 self.network_folder = ""
@@ -101,7 +102,7 @@ class TrainPregis:
     def __load_models(self):
         train_config = self.network_config['train']
 
-        self.train_data_loader, self.validate_data_loader = \
+        self.train_data_loader, self.validate_data_loader, self.tumor_data_loader = \
             create_dataloader(self.network_config['model'], train_config)
         self.pregis_net = create_model(self.network_config['model'], self.network_mode)
         self.pregis_net.network_mode = self.network_mode
@@ -257,7 +258,8 @@ class TrainPregis:
                         epoch_loss_dict[loss_key] += loss_dict[loss_key].item()
 
                 if (i + 1) % summary_batch_period == 0:  # print summary every k batches
-                    to_print = "====>{:0d}, {:0d}".format(current_epoch + 1, global_step)
+                    to_print = "====>{:0d}, {:0d}, lr:{}".format(current_epoch + 1, global_step,
+                                                                 self.optimizer.param_groups[0]['lr'])
 
                     for loss_key in epoch_loss_dict:
                         writer.add_scalar('training/training_{}'.format(loss_key),
@@ -391,6 +393,27 @@ class TrainPregis:
                                    save_file)
                     else:
                         raise ValueError("Wrong Mode")
+
+                    for k, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
+                        moving_image = moving_image.cuda()
+                        target_image = target_image.cuda()
+                        self.pregis_net(moving_image, target_image)
+
+                        if k == 0:
+                            # view tumor result
+                            images_to_show = [moving_image, target_image]
+                            phis_to_show = []
+                            if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
+                                images_to_show.append(self.pregis_net.warped_image.detach())
+                                phis_to_show.append(self.pregis_net.phi.detach())
+
+                            if self.network_mode == 'recons' or self.network_mode == 'pregis':
+                                images_to_show.append(self.pregis_net.recons_image.detach())
+                                images_to_show.append(self.pregis_net.diff_image.detach())
+
+                            image_summary = make_image_summary(images_to_show, phis_to_show)
+                            for key, value in image_summary.items():
+                                writer.add_image("tumor_" + key, value, global_step=global_step)
 
             current_epoch = current_epoch + 1
 

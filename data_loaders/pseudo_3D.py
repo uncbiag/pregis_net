@@ -1,7 +1,6 @@
 from __future__ import print_function, division
 from torch.utils.data import Dataset, DataLoader
 
-import numpy as np
 import glob
 from utils.utils import *
 import progressbar as pb

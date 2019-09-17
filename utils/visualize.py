@@ -10,7 +10,7 @@ from matplotlib.figure import Figure
 plt.rcParams.update({'figure.max_open_warning': 0})
 
 
-def generate_deform_grid(transform, slice_axis=0, background_image=None):
+def generate_deform_grid(transform, slice_axis=0, background_image=None, dim=3):
     if isinstance(transform, torch.Tensor):
         transform = transform.cpu().numpy()
     if background_image is not None:
@@ -18,8 +18,14 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None):
             background_image = background_image.cpu().numpy()
         assert background_image.shape[1:] == transform.shape[1:]
 
-    left_axis = [0, 1, 2]
-    left_axis.remove(slice_axis)
+    dim = len(transform.shape) - 1
+    if dim == 2:
+        left_axis = [0, 1]
+    elif dim == 3:
+        left_axis = [0, 1, 2]
+        left_axis.remove(slice_axis)
+    else:
+        raise ValueError("Dimension error")
 
     fig = plt.figure(figsize=np.array(transform.shape[1:]) / 5, dpi=10)
     ax = fig.add_axes([0, 0, 1, 1])
@@ -56,7 +62,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
             for phi in phis_to_show:
                 phi_slice = phi[n, :, :, :]
                 grid_slice = torch.from_numpy(
-                    generate_deform_grid(phi_slice, background_image=image_slices[2])
+                    generate_deform_grid(phi_slice, background_image=image_slices[2], dim=2)
                 )
                 grid_slices.append(grid_slice)
             grid_slices_to_show += grid_slices
@@ -72,7 +78,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
                 for phi in phis_to_show:
                     phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
                     grid_slice = torch.from_numpy(
-                        generate_deform_grid(phi_slice, axis - 1, image_slices[2])
+                        generate_deform_grid(phi_slice, axis - 1, image_slices[2], dim=3)
                     )
                     grid_slices.append(grid_slice)
                 image_slices_to_show += image_slices

@@ -13,7 +13,7 @@ class TrainPregis:
     def __init__(self):
         self.dataset = 'pseudo_2D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
-        self.network_mode = 'mermaid'
+        self.network_mode = 'recons'
 
         self.time = None
 
@@ -310,6 +310,7 @@ class TrainPregis:
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
                 with torch.no_grad():
                     self.pregis_net.eval()
+
                     eval_loss_dict = {
                         'mermaid_all_loss': 0.0,
                         'mermaid_reg_loss': 0.0,
@@ -394,15 +395,18 @@ class TrainPregis:
                     else:
                         raise ValueError("Wrong Mode")
 
-                    for k, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
+
+
+                    for kk, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
                         moving_image = moving_image.cuda()
                         target_image = target_image.cuda()
                         self.pregis_net(moving_image, target_image)
 
-                        if k == 0:
+                        if kk == 0:
                             # view tumor result
                             images_to_show = [moving_image, target_image]
                             phis_to_show = []
+
                             if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
                                 images_to_show.append(self.pregis_net.warped_image.detach())
                                 phis_to_show.append(self.pregis_net.phi.detach())
@@ -416,6 +420,7 @@ class TrainPregis:
                                 writer.add_image("tumor_" + key, value, global_step=global_step)
 
             current_epoch = current_epoch + 1
+            writer.close()
 
 
 if __name__ == '__main__':

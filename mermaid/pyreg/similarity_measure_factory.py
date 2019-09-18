@@ -540,7 +540,7 @@ class LNCCSimilarity(SimilarityMeasure):
             target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
 
             lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
-            torch.clamp(lncc, 0, 1)
+            lncc = torch.clamp(lncc, min=0.0, max=1.0)
             if torch.max(lncc) > 1 or torch.min(lncc) < 0:
                 print(torch.max(lncc))
                 print(torch.min(lncc))

@@ -16,10 +16,10 @@
                 "dp_p": 0.2,
                 "use_TV_loss": true,
                 "KLD_weight": 1,
-                "L1_weight": 0.1,
+                "L1_weight": 1,
                 "TV_weight": 1,
                 "recons_weight": 1,
-                "sim_weight": 0.1,
+                "sim_weight": 0.05,
                 "mode_change_epoch": 100
             }
         }
@@ -34,9 +34,8 @@
             "scheduler":{
                 "name": "multistepLR",
                 "milestones": [
-                    200,
-                    400,
-                    600
+                    500,
+                    800
                 ],
                 "gamma": 0.1
             }

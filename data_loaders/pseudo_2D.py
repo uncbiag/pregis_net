@@ -18,7 +18,7 @@ class Pseudo2DDataset(Dataset):
         elif dataset_mode == 'validation':
             self.image_files = sorted(glob.glob(os.path.join(data_path, '*.nii.gz')))[80:100]
         elif dataset_mode == 'tumor':
-            self.image_files = sorted(glob.glob(os.path.join(tumor_path, '*.nii.gz')))[90:100]
+            self.image_files = sorted(glob.glob(os.path.join(tumor_path, '*.nii.gz')))[91:100]
         else:
             raise ValueError('Mode Wrong!')
 

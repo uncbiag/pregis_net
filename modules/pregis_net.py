@@ -51,20 +51,20 @@ class PregisNet(nn.Module):
     #  Forward pass
     #####################################
 
-    def single_forward(self, moving, target):
+    def single_forward(self, moving, target, mode='train'):
 
         if self.network_mode == 'pregis':
             self.warped_image, self.phi = self.mermaid_net(moving, target)
-            self.recons_image, self.diff_image = self.recons_net(self.warped_image, target)
+            self.recons_image, self.diff_image = self.recons_net(self.warped_image, target, mode)
         elif self.network_mode == 'mermaid':
             self.warped_image, self.phi = self.mermaid_net(moving, target)
         elif self.network_mode == 'recons':
-            self.recons_image, self.diff_image = self.recons_net(moving, target)
+            self.recons_image, self.diff_image = self.recons_net(moving, target, mode)
         else:
             raise ValueError("Network option is not correct.")
 
         return
 
-    def forward(self, moving, target):
-        self.single_forward(moving, target)
+    def forward(self, moving, target, mode='train'):
+        self.single_forward(moving, target, mode)
         return

@@ -74,7 +74,9 @@ class ConBnRelDp(nn.Module):
         elif activate_unit == 'elu':
             self.activate_unit = nn.ELU(inplace=True)
         elif activate_unit == 'leaky_relu':
-            self.activate_unit = nn.LeakyReLU(negative_slope=0.2, inplace=True)
+            self.activate_unit = nn.LeakyReLU(inplace=True)
+        elif activate_unit == 'prelu':
+            self.activate_unit = nn.PReLU(init=0.01)
         else:
             self.activate_unit = False
         self.drop_out = drop_out(0.2) if use_dp else False
@@ -83,10 +85,10 @@ class ConBnRelDp(nn.Module):
 
     def forward(self, x):
         x = self.conv(x)
-        if self.batch_norm is not False:
-            x = self.batch_norm(x)
         if self.activate_unit is not False:
             x = self.activate_unit(x)
+        if self.batch_norm is not False:
+            x = self.batch_norm(x)
         if self.drop_out is not False:
             x = self.drop_out(x)
         return x

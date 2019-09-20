@@ -134,16 +134,16 @@ class TrainPregis:
 
         if self.network_mode == 'recons' or self.network_mode == 'pregis':
             print(self.network_config)
-            use_tv_loss = self.network_config['model']['pregis_net']['recons_net']['use_TV_loss']
+            l1_weight = self.network_config['model']['pregis_net']['recons_net']['L1_weight']
 
             kld_weight = self.network_config['model']['pregis_net']['recons_net']['KLD_weight']
             tv_weight = self.network_config['model']['pregis_net']['recons_net']['TV_weight']
             recons_weight = self.network_config['model']['pregis_net']['recons_net']['recons_weight']
             sim_weight = self.network_config['model']['pregis_net']['recons_net']['sim_weight']
-            my_name = my_name + '_kld_{}_recons_{}_sim_{}_useTV_{}_tv_{}'.format(kld_weight,
+            my_name = my_name + '_kld_{}_recons_{}_sim_{}_l1_{}_tv_{}'.format(kld_weight,
                                                                                  recons_weight,
                                                                                  sim_weight,
-                                                                                 use_tv_loss,
+                                                                                 l1_weight,
                                                                                  tv_weight)
 
         self.network_folder = os.path.join(os.path.dirname(__file__),
@@ -239,7 +239,7 @@ class TrainPregis:
                 moving_image = moving_image.cuda()
                 target_image = target_image.cuda()
 
-                self.pregis_net(moving_image, target_image)
+                self.pregis_net(moving_image, target_image, 'train')
                 loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image, current_epoch)
                 if self.network_mode == 'pregis':
                     loss_dict['all_loss'].backward()
@@ -326,7 +326,7 @@ class TrainPregis:
                     for j, (moving_image, target_image) in enumerate(self.validate_data_loader, 0):
                         moving_image = moving_image.cuda()
                         target_image = target_image.cuda()
-                        self.pregis_net(moving_image, target_image)
+                        self.pregis_net(moving_image, target_image, 'test')
                         loss_dict = self.pregis_net.cal_pregis_loss(moving_image, target_image, current_epoch)
                         for loss_key in eval_loss_dict:
                             if loss_key in loss_dict:
@@ -376,31 +376,32 @@ class TrainPregis:
                         else:
                             raise ValueError("Wrong Mode")
 
-                    save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
-                    if self.network_mode == 'pregis':
-                        torch.save({'epoch': current_epoch,
-                                    'model_state_dict': self.pregis_net.state_dict(),
-                                    'optimizer_state_dict': self.optimizer.state_dict()},
-                                   save_file)
-                    elif self.network_mode == 'mermaid':
-                        torch.save({'epoch': current_epoch,
-                                    'model_state_dict': self.pregis_net.mermaid_net.state_dict(),
-                                    'optimizer_state_dict': self.optimizer.state_dict()},
-                                   save_file)
-                    elif self.network_mode == 'recons':
-                        torch.save({'epoch': current_epoch,
-                                    'model_state_dict': self.pregis_net.recons_net.state_dict(),
-                                    'optimizer_state_dict': self.optimizer.state_dict()},
-                                   save_file)
-                    else:
-                        raise ValueError("Wrong Mode")
+                    if current_epoch % 100 == 0:
+                        save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
+                        if self.network_mode == 'pregis':
+                            torch.save({'epoch': current_epoch,
+                                        'model_state_dict': self.pregis_net.state_dict(),
+                                        'optimizer_state_dict': self.optimizer.state_dict()},
+                                       save_file)
+                        elif self.network_mode == 'mermaid':
+                            torch.save({'epoch': current_epoch,
+                                        'model_state_dict': self.pregis_net.mermaid_net.state_dict(),
+                                        'optimizer_state_dict': self.optimizer.state_dict()},
+                                        save_file)
+                        elif self.network_mode == 'recons':
+                            torch.save({'epoch': current_epoch,
+                                        'model_state_dict': self.pregis_net.recons_net.state_dict(),
+                                        'optimizer_state_dict': self.optimizer.state_dict()},
+                                        save_file)
+                        else:
+                            raise ValueError("Wrong Mode")
 
 
 
                     for kk, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
                         moving_image = moving_image.cuda()
                         target_image = target_image.cuda()
-                        self.pregis_net(moving_image, target_image)
+                        self.pregis_net(moving_image, target_image, 'test')
 
                         if kk == 0:
                             # view tumor result

@@ -145,28 +145,17 @@ class CustomizedSimilarity(SimilarityMeasure):
         sz0 = I0.size()[0]
         sz1 = I1.size()[0]
         assert (sz0 == sz1 or sz0 == sz1 - 1)
-        # if sz1 > 1:
-        #    num_of_labels = sz1 - 2
-        # else:
-        #    num_of_labels = 0
         num_of_labels = sz0 - 1
         mask = None
-        # if sz1 > 1:
-        #    M1 = I1[1,...]
-        #    M1 = torch.isclose(M1, torch.cuda.FloatTensor([1])).float()
-        #    if sz0 == sz1:
-        #        M0 = I0[1,...]
-        #        M0 = torch.isclose(M0, torch.cuda.FloatTensor([1])).float(`
-        #        mask = torch.isclose(M0 + M1, torch.cuda.FloatTensor([2])).float()+        #    else:
-        #        mask = M1
+        if sz0 == sz1 - 1 :
+            mask = I1[-1, ...]
+
         sim = 0
         sim = sim + self.compute_similarity(I0[0, ...], I1[0, ...], mask=mask, isLabel=False)
 
         if num_of_labels > 0:
             I0_labels = I0[1:, ...]
             I1_labels = I1[1:, ...]
-            # I0_labels = 1-torch.isclose(I0_labels,torch.cuda.FloatTensor([0])).float()
-            # I1_labels = 1-torch.isclose(I1_labels,torch.cuda.FloatTensor([0])).float()
             for nrL in range(num_of_labels):
                 sim = sim + self.compute_similarity(I0_labels[nrL, ...], I1_labels[nrL, ...], mask=mask, isLabel=True)
         return AdaptVal(sim / self.sigma ** 2)
@@ -176,13 +165,10 @@ class CustomizedSimilarity(SimilarityMeasure):
             I0_v = I0
             I1_v = I1
         else:
-            I0_v = I0
-            I1_v = I1
-            # I0_v = torch.where(mask == 1, I0, mask)
-            # I1_v = torch.where(mask == 1, I1, mask)
+            I0_v = torch.where(mask == 1, I0, mask)
+            I1_v = torch.where(mask == 1, I1, mask)
         if isLabel:
             # labels
-
             sim = ((I0_v - I1_v) ** 2).sum()
             sim = sim / ((I1_v ** 2).sum() + (I0_v ** 2).sum())
         else:
@@ -314,8 +300,13 @@ class NCCSimilarity(SimilarityMeasure):
 
         I0mean = I0.mean()
         I1mean = I1.mean()
-        nccSqr = (((I0 - I0mean.expand_as(I0)) * (I1 - I1mean.expand_as(I1))).mean() ** 2) / \
-                 (((I0 - I0mean) ** 2).mean() * ((I1 - I1mean) ** 2).mean())
+        if I0mean == 0 and I1mean == 0:
+            nccSqr = torch.tensor(1)
+        elif I0mean == 0 or I1mean == 0:
+            nccSqr = torch.tensor(0)
+        else:
+            nccSqr = (((I0 - I0mean.expand_as(I0)) * (I1 - I1mean.expand_as(I1))).mean() ** 2) / \
+                     (((I0 - I0mean) ** 2).mean() * ((I1 - I1mean) ** 2).mean())
         return AdaptVal((1 - nccSqr) / self.sigma ** 2)
 
         # ncc = ((I0-I0.mean().expand_as(I0))*(I1-I1.mean().expand_as(I1))).mean()/(I0.std()*I1.std())

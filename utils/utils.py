@@ -44,7 +44,6 @@ def create_model(network_config, network_mode):
 
 def create_dataloader(model_config, tr_config):
     dataset = model_config['dataset']
-    dataset_type = model_config['dataset_type']
     print("Dataset to load: {}".format(dataset))
     if dataset == "brats_3D":
         MyDataset = brats_3D_dataset.Brats3DDataset
@@ -55,9 +54,9 @@ def create_dataloader(model_config, tr_config):
     else:
         raise ValueError("dataset not available")
 
-    my_train_dataset = MyDataset('training', dataset_type)
-    my_validate_dataset = MyDataset('validation', dataset_type)
-    my_tumor_dataset = MyDataset('tumor', dataset_type)
+    my_train_dataset = MyDataset('training')
+    my_validate_dataset = MyDataset('validation')
+    my_test_dataset = MyDataset('test')
     atlas_file = my_train_dataset.atlas_file
     print(atlas_file)
     image_io = py_fio.ImageIO()
@@ -72,16 +71,16 @@ def create_dataloader(model_config, tr_config):
                                       shuffle=True,
                                       num_workers=1,
                                       drop_last=True)
-    tumor_data_loader = DataLoader(my_tumor_dataset,
-                                   batch_size=tr_config['batch_size'],
-                                   shuffle=False,
-                                   num_workers=1,
-                                   drop_last=True)
+    test_data_loader = DataLoader(my_test_dataset,
+                                  batch_size=tr_config['batch_size'],
+                                  shuffle=False,
+                                  num_workers=1,
+                                  drop_last=True)
     model_config['img_sz'] = [tr_config['batch_size'], 1] + list(target_image.shape[2:])
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc
     model_config['target_spacing'] = target_spacing
-    return train_data_loader, validate_data_loader, tumor_data_loader
+    return train_data_loader, validate_data_loader, test_data_loader
 
 
 def create_optimizer(config, model):

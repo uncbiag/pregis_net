@@ -173,21 +173,21 @@ class PregisNet(nn.Module):
         x = self.decoder2_conv_14(z)
         x = self.decoder2_maxunpool_14(x, indices_l4)
         # x = self.decoder2_conv_14u(z)
-        # x = torch.cat((x_l4, x), dim=1)
+        x = torch.cat((x_l4, x), dim=1)
         x = self.decoder2_conv_15(x)
         x = self.decoder2_conv_16(x)
         x = self.decoder2_maxunpool_17(x, indices_l3)
         # x = self.decoder2_conv_17u(x)
-        # x = torch.cat((x_l3, x), dim=1)
+        x = torch.cat((x_l3, x), dim=1)
         x = self.decoder2_conv_18(x)
         x = self.decoder2_conv_19(x)
         x = self.decoder2_maxunpool_14(x, indices_l2)
         # x = self.decoder2_conv_20u(x)
-        # x = torch.cat((x_l2, x), dim=1)
+        x = torch.cat((x_l2, x), dim=1)
         x = self.decoder2_conv_21(x)
         x = self.decoder2_conv_22(x)
         x = self.decoder2_conv_23u(x)
-        #x = torch.cat((x_l1, x), dim=1)
+        x = torch.cat((x_l1, x), dim=1)
         x = self.decoder2_conv_24(x)
         self.recons = self.decoder2_conv_25o(x)
 
@@ -280,27 +280,27 @@ class PregisNet(nn.Module):
         self.decoder2_maxunpool_14 = MaxUnpool(kernel_size=2, dim=self.dim)
         # self.decoder2_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
         #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_15 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_conv_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_conv_16 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_maxunpool_17 = MaxUnpool(kernel_size=2, dim=self.dim)
         # self.decoder2_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
         #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_18 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_conv_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_conv_19 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_maxunpool_20 = MaxUnpool(kernel_size=2, dim=self.dim)
         # self.decoder2_conv_20u = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
         #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_21 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_conv_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_conv_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
         self.decoder2_conv_23u = ConBnRelDp(16, 16, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
                                             use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_24 = ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+        self.decoder2_conv_24 = ConBnRelDp(32, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.decoder2_conv_25o = ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
 
         # Decoder for Pathology

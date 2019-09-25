@@ -108,7 +108,7 @@ class PregisNet(nn.Module):
             variables_from_optimizer=None
         )
         if current_epoch < 50:
-            sim_factor = 1./(np.exp((25-current_epoch)/10)+1)
+            sim_factor = 1./(np.exp((25-current_epoch)/5)+1)
         else :
             sim_factor = 1.
         all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size

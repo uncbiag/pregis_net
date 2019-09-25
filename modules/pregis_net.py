@@ -108,7 +108,8 @@ class PregisNet(nn.Module):
             variables_from_optimizer=None
         )
         sim_factor = 1./(np.exp((100-current_epoch)/20)+1)
-        all_loss = sim_factor * mermaid_sim_loss + mermaid_reg_loss
+        all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
+        print(all_loss)
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,
@@ -133,6 +134,7 @@ class PregisNet(nn.Module):
         recons_loss = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
         loss_dict['recons_loss'] = recons_loss
         all_loss += self.recons_weight * recons_loss
+        print(all_loss)
         loss_dict['all_loss'] = all_loss
         return loss_dict
 

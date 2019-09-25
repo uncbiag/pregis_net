@@ -181,7 +181,7 @@ class TrainPregis:
                 'mermaid_reg_loss': 0.0,
                 'mermaid_sim_loss': 0.0,
                 'recons_loss': 0.0,
-                'segmentation_loss': 0.0,
+                # 'segmentation_loss': 0.0,
                 'all_loss': 0.0
             }
 
@@ -227,11 +227,11 @@ class TrainPregis:
                     )
                     images_to_show.append(self.pregis_net.warped_image.detach())
                     images_to_show.append(self.pregis_net.recons.detach())
-                    images_to_show.append(self.pregis_net.abnormal_mask.detach())
+                    # images_to_show.append(self.pregis_net.abnormal_mask.detach())
                     phis_to_show.append(self.pregis_net.phi.detach())
-                    to_print += ', recons_loss:{:.6f}, seg_loss:{:.6f}'.format(
+                    to_print += ', recons_loss:{:.6f}'.format(
                         epoch_loss_dict['recons_loss'] / summary_batch_period,
-                        epoch_loss_dict['segmentation_loss'] / summary_batch_period,
+                        # epoch_loss_dict['segmentation_loss'] / summary_batch_period,
                     )
 
                     image_summary = make_image_summary(images_to_show, phis_to_show)
@@ -244,7 +244,7 @@ class TrainPregis:
                         'mermaid_reg_loss': 0.0,
                         'mermaid_sim_loss': 0.0,
                         'recons_loss': 0.0,
-                        'segmentation_loss': 0.0,
+                        # 'segmentation_loss': 0.0,
                         'all_loss': 0.0
                     }
 
@@ -257,7 +257,7 @@ class TrainPregis:
                         'mermaid_reg_loss': 0.0,
                         'mermaid_sim_loss': 0.0,
                         'recons_loss': 0.0,
-                        'segmentation_loss': 0.0,
+                        # 'segmentation_loss': 0.0,
                         'all_loss': 0.0
                     }
                     for j, (moving_image, target_image, mask_image) in enumerate(self.validate_data_loader, 0):
@@ -277,7 +277,7 @@ class TrainPregis:
 
                             images_to_show.append(self.pregis_net.warped_image.detach())
                             images_to_show.append(self.pregis_net.recons.detach())
-                            images_to_show.append(self.pregis_net.abnormal_mask.detach())
+                            # images_to_show.append(self.pregis_net.abnormal_mask.detach())
 
                             phis_to_show.append(self.pregis_net.phi.detach())
                             image_summary = make_image_summary(images_to_show, phis_to_show)

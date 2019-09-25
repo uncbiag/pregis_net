@@ -97,7 +97,7 @@ class PregisNet(nn.Module):
         self.sampler = py_is.ResampleImage()
         return
 
-    def calculate_pregis_loss(self, moving, target, normal_mask=None):
+    def calculate_pregis_loss(self, moving, target, current_epoch, normal_mask=None):
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
@@ -107,7 +107,7 @@ class PregisNet(nn.Module):
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
-
+        sim_factor = 1./(np.exp((100-current_epoch)/20)+1)
         all_loss = sim_factor * mermaid_sim_loss + mermaid_reg_loss
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
@@ -130,9 +130,7 @@ class PregisNet(nn.Module):
         recons_normal_w_mask = torch.mul(self.recons, normal_mask)
         recons_abnormal_w_mask = torch.cat((self.recons, abnormal_mask), dim=1)
 
-        recons_loss1 = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
-        recons_loss2 = self.sim_criterion.compute_similarity_multiNC(target, recons_abnormal_w_mask) / self.batch_size
-        recons_loss = recons_loss2 + recons_loss1
+        recons_loss = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
         loss_dict['recons_loss'] = recons_loss
         all_loss += self.recons_weight * recons_loss
         loss_dict['all_loss'] = all_loss

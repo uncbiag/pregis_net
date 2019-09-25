@@ -7,8 +7,8 @@
             "bn": false,
             "dp": false,
             "dp_p": 0.2,
-            "recons_weight": 1,
-            "seg_weight": 1
+            "recons_weight": 10,
+            "seg_weight": 10
         }
     },
     "train":{

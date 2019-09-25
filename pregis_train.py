@@ -196,7 +196,7 @@ class TrainPregis:
                 mask_image = mask_image.cuda()
 
                 self.pregis_net(moving_image, target_image, 'train')
-                loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, mask_image)
+                loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
                 if self.network_mode == 'pregis':
                     loss_dict['all_loss'].backward()
                 else:
@@ -265,7 +265,7 @@ class TrainPregis:
                         target_image = target_image.cuda()
                         mask_image = mask_image.cuda()
                         self.pregis_net(moving_image, target_image, 'test')
-                        loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, mask_image)
+                        loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
                         for loss_key in eval_loss_dict:
                             if loss_key in loss_dict:
                                 eval_loss_dict[loss_key] += loss_dict[loss_key].item()

@@ -1,4 +1,4 @@
-use_mermaid_net = True
+use_mermaid_net = False
 reg_factor_in_mermaid = 1.
 update_sm_by_advect = False
 update_sm_with_interpolation =False

@@ -111,7 +111,7 @@ class PregisNet(nn.Module):
             sim_factor = 1./(np.exp((25-current_epoch)/10)+1)
         else :
             sim_factor = 1.
-        all_loss = sim_factor * mermaid_sim_loss + mermaid_reg_loss
+        all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,

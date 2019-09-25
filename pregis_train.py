@@ -197,6 +197,7 @@ class TrainPregis:
 
                 self.pregis_net(moving_image, target_image, 'train')
                 loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
+                print(loss_dict['all_loss'])
                 if self.network_mode == 'pregis':
                     loss_dict['all_loss'].backward()
                 else:
@@ -211,7 +212,7 @@ class TrainPregis:
                 if (i + 1) % summary_batch_period == 0:  # print summary every k batches
                     to_print = "====>{:0d}, {:0d}, lr:{}, all_loss:{}".format(current_epoch + 1, global_step,
                                                                               self.optimizer.param_groups[0]['lr'],
-                                                                              loss_dict['all_loss'])
+                                                                              epoch_loss_dict['all_loss'] / summary_batch_period)
 
                     for loss_key in epoch_loss_dict:
                         writer.add_scalar('training/training_{}'.format(loss_key),

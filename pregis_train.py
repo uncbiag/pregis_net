@@ -197,7 +197,6 @@ class TrainPregis:
 
                 self.pregis_net(moving_image, target_image, 'train')
                 loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
-                print(loss_dict['all_loss'])
                 if self.network_mode == 'pregis':
                     loss_dict['all_loss'].backward()
                 else:
@@ -248,7 +247,7 @@ class TrainPregis:
                         # 'segmentation_loss': 0.0,
                         'all_loss': 0.0
                     }
-
+                    writer.flush()
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
                 with torch.no_grad():
                     self.pregis_net.eval()
@@ -311,8 +310,7 @@ class TrainPregis:
                                        save_file)
                         else:
                             raise ValueError("Wrong Mode")
-
-
+                    writer.flush()
 
                     # for kk, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
                     #     moving_image = moving_image.cuda()

@@ -11,7 +11,7 @@ from utils.visualize import make_image_summary
 class TrainPregis:
 
     def __init__(self):
-        self.dataset = 'pseudo_2D'
+        self.dataset = 'pseudo_3D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
         self.network_mode = 'pregis'
 

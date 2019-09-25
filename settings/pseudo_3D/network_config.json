@@ -1,50 +1,37 @@
 {
-  "model":{
-    "dataset": "pseudo_3D",
-    "dataset_type": "normal",
-    "pregis_net": {
-      "mermaid_net": {
-        "n_of_feature": 32,
-        "bn": false,
-        "dp": false,
-        "dp_p": 0.2
-      },
-      "recons_net": {
-        "n_of_feature": 32,
-        "bn": false,
-        "dp": false,
-        "dp_p": 0.2,
-        "use_TV_loss": false,
-        "KLD_weight": 0.01,
-        "TV_weight": 0.1,
-        "L1_weight": 0,
-        "recons_weight": 1,
-        "sim_weight": 0.05,
-        "mode_change_epoch": 100
-      }
+    "model":{
+        "dataset": "pseudo_3D",
+        "dataset_type": "normal",
+        "pregis_net":{
+            "n_of_feature": 32,
+            "bn": false,
+            "dp": false,
+            "dp_p": 0.2,
+            "recons_weight": 10,
+            "seg_weight": 10
+        }
     },
-  },
-  "train":{
-    "n_of_epochs":100,
-    "batch_size":2,
-    "min_summary_period":10,
-    "optimizer":{
-      "name": "ADAM",
-      "lr": 0.0005,
-      "scheduler":{
-        "name": "multistepLR",
-        "milestones": [
-          25,
-          50,
-          75
-        ],
-        "gamma": 1,
-      },
+    "train":{
+        "n_of_epochs":500,
+        "batch_size":4,
+        "min_summary_period":10,
+        "optimizer":{
+            "name": "ADAM",
+            "lr": 0.001,
+            "scheduler":{
+                "name": "multistepLR",
+                "milestones":[
+                    100,
+                    200,
+                    300
+                ],
+                "gamma": 0.1
+            }
+        }
     },
-  },
-  "validate":{
-    "validate_epoch_period":1
-  },
-  "test":{
-  }
+    "validate":{
+        "validate_epoch_period":1
+    },
+    "test":{
+    }
 }

@@ -18,7 +18,6 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None, dim=3):
             background_image = background_image.cpu().numpy()
         assert background_image.shape[1:] == transform.shape[1:]
 
-    dim = len(transform.shape) - 1
     if dim == 2:
         left_axis = [0, 1]
     elif dim == 3:

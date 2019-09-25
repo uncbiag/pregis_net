@@ -107,7 +107,10 @@ class PregisNet(nn.Module):
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
-        sim_factor = 1./(np.exp((100-current_epoch)/20)+1)
+        if current_epoch < 50:
+            sim_factor = 1./(np.exp((25-current_epoch)/10)+1)
+        else :
+            sim_factor = 1.
         all_loss = sim_factor * mermaid_sim_loss + mermaid_reg_loss
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,

@@ -77,6 +77,8 @@ class ConBnRelDp(nn.Module):
             self.activate_unit = nn.LeakyReLU(inplace=True)
         elif activate_unit == 'prelu':
             self.activate_unit = nn.PReLU(init=0.01)
+        elif activate_unit == 'sigmoid':
+            self.activate_unit = nn.Sigmoid()
         else:
             self.activate_unit = False
         self.drop_out = drop_out(0.2) if use_dp else False

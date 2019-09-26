@@ -109,9 +109,9 @@ class PregisNet(nn.Module):
         )
         sim_factor = 1.0
         if self.dim == 3 and current_epoch < 50:
-            sim_factor = 1./(np.exp((25-current_epoch)/5)+1)
+            sim_factor = 1. / (np.exp((25 - current_epoch) / 5) + 1)
         if self.dim == 2 and current_epoch < 200:
-            sim_factor = 1./(np.exp((100-current_epoch)/20)+1)
+            sim_factor = 1. / (np.exp((100 - current_epoch) / 20) + 1)
         all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
@@ -120,16 +120,15 @@ class PregisNet(nn.Module):
         }
 
         # if normal_mask is not None:
-            # abnormal_mask = 1 - normal_mask
-            # segmentation_loss = self.segmentation_criterion(self.abnormal_mask, abnormal_mask)
-            # all_loss += self.segmentation_weight * segmentation_loss
-            # loss_dict['segmentation_loss'] = segmentation_loss
-
+        # abnormal_mask = 1 - normal_mask
+        # segmentation_loss = self.segmentation_criterion(self.abnormal_mask, abnormal_mask)
+        # all_loss += self.segmentation_weight * segmentation_loss
+        # loss_dict['segmentation_loss'] = segmentation_loss
 
         # else:
-            
-            # abnormal_mask = self.abnormal_mask
-            # normal_mask = 1 - abnormal_mask
+
+        # abnormal_mask = self.abnormal_mask
+        # normal_mask = 1 - abnormal_mask
 
         moving_normal_w_mask = torch.mul(moving, normal_mask)
         recons_normal_w_mask = torch.mul(self.recons, normal_mask)
@@ -169,47 +168,6 @@ class PregisNet(nn.Module):
         x = torch.cat((x_l2, x), dim=1)
         x = self.decoder1_conv_21(x)
         self.momentum = self.decoder1_conv_22o(x)
-
-        # Decode Brain
-        x = self.decoder2_conv_14(z)
-        x = self.decoder2_maxunpool_14(x, indices_l4)
-        # x = self.decoder2_conv_14u(z)
-        # x = torch.cat((x_l4, x), dim=1)
-        x = self.decoder2_conv_15(x)
-        x = self.decoder2_conv_16(x)
-        x = self.decoder2_maxunpool_17(x, indices_l3)
-        # x = self.decoder2_conv_17u(x)
-        # x = torch.cat((x_l3, x), dim=1)
-        x = self.decoder2_conv_18(x)
-        x = self.decoder2_conv_19(x)
-        x = self.decoder2_maxunpool_14(x, indices_l2)
-        # x = self.decoder2_conv_20u(x)
-        # x = torch.cat((x_l2, x), dim=1)
-        x = self.decoder2_conv_21(x)
-        x = self.decoder2_conv_22(x)
-        x = self.decoder2_conv_23u(x)
-        # x = torch.cat((x_l1, x), dim=1)
-        x = self.decoder2_conv_24(x)
-        self.recons = self.decoder2_conv_25o(x)
-
-        # Decode Tumor
-        # x = self.decoder3_conv_14u(z)
-        # x = torch.cat((x_l4, x), dim=1)
-        # x = self.decoder3_conv_15(x)
-        # x = self.decoder3_conv_16(x)
-        # x = self.decoder3_conv_17u(x)
-        # x = torch.cat((x_l3, x), dim=1)
-        # x = self.decoder3_conv_18(x)
-        # x = self.decoder3_conv_19(x)
-        # x = self.decoder3_conv_20u(x)
-        # x = torch.cat((x_l2, x), dim=1)
-        # x = self.decoder3_conv_21(x)
-        # x = self.decoder3_conv_22(x)
-        # x = self.decoder3_conv_23u(x)
-        # x = torch.cat((x_l1, x), dim=1)
-        # x = self.decoder3_conv_24(x)
-        # x = self.decoder3_conv_25o(x)
-        # self.abnormal_mask = torch.sigmoid(x)
 
         warped_image, phi = self.mermaid_shoot(input_image, target_image, self.momentum)
         self.warped_image = warped_image
@@ -274,56 +232,3 @@ class PregisNet(nn.Module):
                                             use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
         self.decoder1_conv_21 = ConBnRelDp(64, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.decoder1_conv_22o = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-
-        # Decoder for Brain
-        self.decoder2_conv_14 = ConBnRelDp(16, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_14 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_15 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_16 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_17 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_18 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_19 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_20 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_20u = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_21 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_23u = ConBnRelDp(16, 16, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                            use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_24 = ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-        self.decoder2_conv_25o = ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-
-        # Decoder for Pathology
-        # self.decoder3_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_20u = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_22 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_23u = ConBnRelDp(32, 16, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_24 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-        # self.decoder3_conv_25o = ConBnRelDp(16, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')

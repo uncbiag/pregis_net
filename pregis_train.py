@@ -25,6 +25,8 @@ class TrainPregis:
             self.root_folder = '/playpen/xhs400/Research/pregis_net'
         elif hostname == 'biag-w05.cs.unc.edu':
             self.root_folder = '/playpen/xhs400/Research/PycharmProjects/pregis_net'
+        elif 'lambda' in hostname:
+            self.root_folder = '/playpen/xhs400/Research/pregis_net'
         else:
             raise ValueError("Wrong host! Please configure.")
         assert (self.root_folder is not None)

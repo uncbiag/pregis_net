@@ -61,7 +61,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
             for phi in phis_to_show:
                 phi_slice = phi[n, :, :, :]
                 grid_slice = torch.from_numpy(
-                    generate_deform_grid(phi_slice, background_image=image_slices[3], dim=2)
+                    generate_deform_grid(phi_slice, background_image=image_slices[2], dim=2)
                 )
                 grid_slices.append(grid_slice)
             grid_slices_to_show += grid_slices
@@ -77,7 +77,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
                 for phi in phis_to_show:
                     phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
                     grid_slice = torch.from_numpy(
-                        generate_deform_grid(phi_slice, axis - 1, image_slices[3], dim=3)
+                        generate_deform_grid(phi_slice, axis - 1, image_slices[2], dim=3)
                     )
                     grid_slices.append(grid_slice)
                 image_slices_to_show += image_slices

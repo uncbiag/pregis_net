@@ -15,12 +15,9 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
     _compute_low_res_image
 
 
-class PregisNet(nn.Module):
-    def __init__(self, model_config, network_mode):
-        super(PregisNet, self).__init__()
-        self.network_mode = network_mode
-        print("PregisNet Mode: {}".format(self.network_mode))
-
+class MermaidNet(nn.Module):
+    def __init__(self, model_config):
+        super(MermaidNet, self).__init__()
         self.use_bn = model_config['pregis_net']['bn']
         self.use_dp = model_config['pregis_net']['dp']
         self.dim = model_config['dim']
@@ -51,8 +48,6 @@ class PregisNet(nn.Module):
 
         # results to return
         self.momentum = None
-        self.recons = None
-        # self.abnormal_mask = None
         self.warped_image = None
         self.phi = None
 
@@ -101,42 +96,18 @@ class PregisNet(nn.Module):
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
-            I0_source=self.recons,
+            I0_source=moving,
             I1_target=target,
             lowres_I0=None,
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
-        sim_factor = 1.0
-        if self.dim == 3 and current_epoch < 50:
-            sim_factor = 1. / (np.exp((25 - current_epoch) / 5) + 1)
-        if self.dim == 2 and current_epoch < 200:
-            sim_factor = 1. / (np.exp((100 - current_epoch) / 20) + 1)
-        all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
         loss_dict = {
-            'mermaid_all_loss': mermaid_all_loss / self.batch_size,
+            'all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,
             'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
         }
 
-        # if normal_mask is not None:
-        # abnormal_mask = 1 - normal_mask
-        # segmentation_loss = self.segmentation_criterion(self.abnormal_mask, abnormal_mask)
-        # all_loss += self.segmentation_weight * segmentation_loss
-        # loss_dict['segmentation_loss'] = segmentation_loss
-
-        # else:
-
-        # abnormal_mask = self.abnormal_mask
-        # normal_mask = 1 - abnormal_mask
-
-        moving_normal_w_mask = torch.mul(moving, normal_mask)
-        recons_normal_w_mask = torch.mul(self.recons, normal_mask)
-
-        recons_loss = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
-        loss_dict['recons_loss'] = recons_loss
-        all_loss += self.recons_weight * recons_loss
-        loss_dict['all_loss'] = all_loss
         return loss_dict
 
     def forward(self, input_image, target_image, mode='train'):

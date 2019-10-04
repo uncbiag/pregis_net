@@ -12,8 +12,8 @@ class TrainPregis:
 
     def __init__(self):
         self.dataset = 'pseudo_2D'
-        # network_mode selected from  'mermaid', 'recons', 'pregis'
-        self.network_mode = 'pregis'
+        # network_mode selected from  'mermaid', 'pregis'
+        self.network_mode = 'mermaid'
 
         self.time = None
         # specify continue training or new training
@@ -53,10 +53,9 @@ class TrainPregis:
     def __setup_configuration_file(self):
         if self.is_continue:
             # to continue, specify the model folder and model
-            if self.network_mode == 'pregis':
-                self.network_folder = ""
-                self.network_file['pregis_net'] = os.path.join(self.network_folder, "")
-                self.network_config_file = os.path.join(self.network_folder, 'pregis_network_config.json')
+            self.network_folder = ""
+            self.network_file['pregis_net'] = os.path.join(self.network_folder, "")
+            self.network_config_file = os.path.join(self.network_folder, 'pregis_network_config.json')
 
             self.mermaid_config_file = os.path.join(self.network_folder, 'mermaid_config.json')
         else:
@@ -74,15 +73,13 @@ class TrainPregis:
         self.network_config['model']['mermaid_config_file'] = self.mermaid_config_file
 
     def __load_models(self):
-        train_config = self.network_config['train']
-
         self.train_data_loader, self.validate_data_loader, self.tumor_data_loader = \
-            create_dataloader(self.network_config['model'], train_config)
+            create_dataloader(self.network_config)
         self.pregis_net = create_model(self.network_config['model'], self.network_mode)
         self.pregis_net.network_mode = self.network_mode
 
-        if self.network_mode == 'pregis':
-            self.optimizer, self.scheduler = create_optimizer(train_config, self.pregis_net)
+        if self.network_mode == 'pregis' or self.network_mode == 'mermaid':
+            self.optimizer, self.scheduler = create_optimizer(self.network_config['train'], self.pregis_net)
         else:
             raise ValueError("Wrong network mode")
 
@@ -186,21 +183,21 @@ class TrainPregis:
             }
 
             self.scheduler.step(epoch=current_epoch + 1)
-            for i, (moving_image, target_image, mask_image) in enumerate(self.train_data_loader, 0):
+            for i, images in enumerate(self.train_data_loader, 0):
                 self.pregis_net.train()
                 self.optimizer.zero_grad()
                 global_step = current_epoch * iters_per_epoch + (i + 1)
 
-                moving_image = moving_image.cuda()
-                target_image = target_image.cuda()
-                mask_image = mask_image.cuda()
-
-                self.pregis_net(moving_image, target_image, 'train')
-                loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
-                if self.network_mode == 'pregis':
-                    loss_dict['all_loss'].backward()
+                moving_image = images[0].cuda()
+                target_image = images[1].cuda()
+                if len(images) == 3:
+                    mask_image = images[2].cuda()
                 else:
-                    raise ValueError("Wrong network_mode")
+                    mask_image = None
+
+                self.pregis_net(moving_image, target_image)
+                loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
+                loss_dict['all_loss'].backward()
                 # torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
                 self.optimizer.step()
 
@@ -217,7 +214,8 @@ class TrainPregis:
                         writer.add_scalar('training/training_{}'.format(loss_key),
                                           epoch_loss_dict[loss_key] / summary_batch_period, global_step=global_step)
 
-                    images_to_show = [moving_image, target_image, mask_image]
+                    images_to_show = [moving_image, target_image]
+
                     phis_to_show = []
 
                     to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}".format(
@@ -226,7 +224,11 @@ class TrainPregis:
                         epoch_loss_dict['mermaid_reg_loss'] / summary_batch_period
                     )
                     images_to_show.append(self.pregis_net.warped_image.detach())
-                    images_to_show.append(self.pregis_net.recons.detach())
+
+                    if self.network_mode == "pregis":
+                        images_to_show.append(self.pregis_net.recons.detach())
+                    if mask_image is not None:
+                        images_to_show.append(mask_image)
                     # images_to_show.append(self.pregis_net.abnormal_mask.detach())
                     phis_to_show.append(self.pregis_net.phi.detach())
                     to_print += ', recons_loss:{:.6f}'.format(
@@ -260,11 +262,14 @@ class TrainPregis:
                         # 'segmentation_loss': 0.0,
                         'all_loss': 0.0
                     }
-                    for j, (moving_image, target_image, mask_image) in enumerate(self.validate_data_loader, 0):
-                        moving_image = moving_image.cuda()
-                        target_image = target_image.cuda()
-                        mask_image = mask_image.cuda()
-                        self.pregis_net(moving_image, target_image, 'test')
+                    for j, images in enumerate(self.validate_data_loader, 0):
+                        moving_image = images[0].cuda()
+                        target_image = images[1].cuda()
+                        if len(images) == 3:
+                            mask_image = images[2].cuda()
+                        else:
+                            mask_image = None
+                        self.pregis_net(moving_image, target_image)
                         loss_dict = self.pregis_net.calculate_pregis_loss(moving_image, target_image, current_epoch, mask_image)
                         for loss_key in eval_loss_dict:
                             if loss_key in loss_dict:
@@ -272,12 +277,14 @@ class TrainPregis:
 
                         if j == 0:
                             # view validation result
-                            images_to_show = [moving_image, target_image, mask_image]
+                            images_to_show = [moving_image, target_image]
                             phis_to_show = []
 
                             images_to_show.append(self.pregis_net.warped_image.detach())
-                            images_to_show.append(self.pregis_net.recons.detach())
-                            # images_to_show.append(self.pregis_net.abnormal_mask.detach())
+                            if self.network_mode == "pregis":
+                                images_to_show.append(self.pregis_net.recons.detach())
+                            if mask_image is not None:
+                                images_to_show.append(mask_image)
 
                             phis_to_show.append(self.pregis_net.phi.detach())
                             image_summary = make_image_summary(images_to_show, phis_to_show)
@@ -293,46 +300,38 @@ class TrainPregis:
                         min_val_loss = eval_loss_dict['mermaid_all_loss']
                         save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
                         print("Writing current best eval model")
-                        if self.network_mode == 'pregis':
-                            torch.save({'epoch': current_epoch,
-                                        'model_state_dict': self.pregis_net.state_dict(),
-                                        'optimizer_state_dict': self.optimizer.state_dict()},
-                                       save_file)
-                        else:
-                            raise ValueError("Wrong Mode")
+                        torch.save({'epoch': current_epoch,
+                                    'model_state_dict': self.pregis_net.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    save_file)
 
                     if current_epoch % 100 == 0:
                         save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
-                        if self.network_mode == 'pregis':
-                            torch.save({'epoch': current_epoch,
-                                        'model_state_dict': self.pregis_net.state_dict(),
-                                        'optimizer_state_dict': self.optimizer.state_dict()},
-                                       save_file)
-                        else:
-                            raise ValueError("Wrong Mode")
+                        torch.save({'epoch': current_epoch,
+                                    'model_state_dict': self.pregis_net.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    save_file)
                     writer.flush()
 
-                    # for kk, (moving_image, target_image) in enumerate(self.tumor_data_loader, 0):
-                    #     moving_image = moving_image.cuda()
-                    #     target_image = target_image.cuda()
-                    #     self.pregis_net(moving_image, target_image, 'test')
-                    #
-                    #     if kk == 0:
-                    #         # view tumor result
-                    #         images_to_show = [moving_image, target_image]
-                    #         phis_to_show = []
-                    #
-                    #         if self.network_mode == 'mermaid' or self.network_mode == 'pregis':
-                    #             images_to_show.append(self.pregis_net.warped_image.detach())
-                    #             phis_to_show.append(self.pregis_net.phi.detach())
-                    #
-                    #         if self.network_mode == 'recons' or self.network_mode == 'pregis':
-                    #             images_to_show.append(self.pregis_net.recons_image.detach())
-                    #             images_to_show.append(self.pregis_net.diff_image.detach())
-                    #
-                    #         image_summary = make_image_summary(images_to_show, phis_to_show)
-                    #         for key, value in image_summary.items():
-                    #             writer.add_image("tumor_" + key, value, global_step=global_step)
+                    for kk, images in enumerate(self.tumor_data_loader, 0):
+                        moving_image = images[0].cuda()
+                        target_image = images[1].cuda()
+                        self.pregis_net(moving_image, target_image)
+
+                        if kk == 0:
+                            # view tumor result
+                            images_to_show = [moving_image, target_image]
+                            phis_to_show = []
+
+                            images_to_show.append(self.pregis_net.warped_image.detach())
+                            phis_to_show.append(self.pregis_net.phi.detach())
+
+                            if self.network_mode == 'pregis':
+                                images_to_show.append(self.pregis_net.recons.detach())
+
+                            image_summary = make_image_summary(images_to_show, phis_to_show)
+                            for key, value in image_summary.items():
+                                writer.add_image("tumor_" + key, value, global_step=global_step)
 
             current_epoch = current_epoch + 1
             writer.close()

@@ -16,10 +16,8 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
 
 
 class PregisNet(nn.Module):
-    def __init__(self, model_config, network_mode):
+    def __init__(self, model_config):
         super(PregisNet, self).__init__()
-        self.network_mode = network_mode
-        print("PregisNet Mode: {}".format(self.network_mode))
 
         self.use_bn = model_config['pregis_net']['bn']
         self.use_dp = model_config['pregis_net']['dp']
@@ -119,18 +117,6 @@ class PregisNet(nn.Module):
             'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
         }
 
-        # if normal_mask is not None:
-            # abnormal_mask = 1 - normal_mask
-            # segmentation_loss = self.segmentation_criterion(self.abnormal_mask, abnormal_mask)
-            # all_loss += self.segmentation_weight * segmentation_loss
-            # loss_dict['segmentation_loss'] = segmentation_loss
-
-
-        # else:
-            
-            # abnormal_mask = self.abnormal_mask
-            # normal_mask = 1 - abnormal_mask
-
         moving_normal_w_mask = torch.mul(moving, normal_mask)
         recons_normal_w_mask = torch.mul(self.recons, normal_mask)
 
@@ -140,7 +126,7 @@ class PregisNet(nn.Module):
         loss_dict['all_loss'] = all_loss
         return loss_dict
 
-    def forward(self, input_image, target_image, mode='train'):
+    def forward(self, input_image, target_image):
         x1 = self.encoder_conv_1i(input_image)
         x2 = self.encoder_conv_2i(target_image)
         x_l1 = torch.cat((x1, x2), dim=1)
@@ -191,25 +177,6 @@ class PregisNet(nn.Module):
         # x = torch.cat((x_l1, x), dim=1)
         x = self.decoder2_conv_24(x)
         self.recons = self.decoder2_conv_25o(x)
-
-        # Decode Tumor
-        # x = self.decoder3_conv_14u(z)
-        # x = torch.cat((x_l4, x), dim=1)
-        # x = self.decoder3_conv_15(x)
-        # x = self.decoder3_conv_16(x)
-        # x = self.decoder3_conv_17u(x)
-        # x = torch.cat((x_l3, x), dim=1)
-        # x = self.decoder3_conv_18(x)
-        # x = self.decoder3_conv_19(x)
-        # x = self.decoder3_conv_20u(x)
-        # x = torch.cat((x_l2, x), dim=1)
-        # x = self.decoder3_conv_21(x)
-        # x = self.decoder3_conv_22(x)
-        # x = self.decoder3_conv_23u(x)
-        # x = torch.cat((x_l1, x), dim=1)
-        # x = self.decoder3_conv_24(x)
-        # x = self.decoder3_conv_25o(x)
-        # self.abnormal_mask = torch.sigmoid(x)
 
         warped_image, phi = self.mermaid_shoot(input_image, target_image, self.momentum)
         self.warped_image = warped_image
@@ -303,27 +270,3 @@ class PregisNet(nn.Module):
                                             use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
         self.decoder2_conv_24 = ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.decoder2_conv_25o = ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-
-        # Decoder for Pathology
-        # self.decoder3_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_20u = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_22 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                    use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.decoder3_conv_23u = ConBnRelDp(32, 16, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.decoder3_conv_24 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-        # self.decoder3_conv_25o = ConBnRelDp(16, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')

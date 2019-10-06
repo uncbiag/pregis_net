@@ -12,12 +12,14 @@ blosc.set_nthreads(1)
 
 
 class CTCBCT(Dataset):
-    def __init__(self, dataset_mode='training'):
+    def __init__(self, dataset_mode='training', with_contours=True):
         root_folder = self.__setup_root_folder()
         assert (root_folder is not None)
-        self.num_of_workers = 20
 
-        image_folder = os.path.join(root_folder, 'data/ct-cbct/images/with_contours')
+        if with_contours:
+            image_folder = os.path.join(root_folder, 'data/ct-cbct/images/with_cbct_contours')
+        else:
+            image_folder = os.path.join(root_folder, 'data/ct-cbct/images_without_cbct_contours')
         patients = sorted(glob.glob(os.path.join(image_folder, '18227*')))
         num_of_patients = len(patients)
         num = num_of_patients // 10
@@ -28,6 +30,12 @@ class CTCBCT(Dataset):
         else:
             raise ValueError("Dataset {} not supported".format(dataset_mode))
 
+
+        all_files = []
+
+        return
+        for patient in patients:
+            pati
 
 
 

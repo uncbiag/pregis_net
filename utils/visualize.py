@@ -43,48 +43,40 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None, dim=3):
     return np.transpose(image, [2, 0, 1])
 
 
-def make_image_summary(images_to_show, phis_to_show, n_samples=1):
+def make_image_summary(images_to_show, labels_to_show, phis_to_show, n_samples=1):
     n_samples = min(n_samples, images_to_show[0].size()[0])
     dim = len(images_to_show[0].shape) - 2
 
     image_slices_to_show = []
+    label_slices_to_show = []
     grid_slices_to_show = []
     grids = {}
     for n in range(n_samples):
-        if dim == 2:
-            image_slices = []
-            for image in images_to_show:
-                image_slice = image[n, :, :, :]
-                image_slices.append(image_slice)
-            image_slices_to_show += image_slices
-            grid_slices = []
-            for phi in phis_to_show:
-                phi_slice = phi[n, :, :, :]
-                grid_slice = torch.from_numpy(
-                    generate_deform_grid(phi_slice, background_image=image_slices[3], dim=2)
-                )
-                grid_slices.append(grid_slice)
-            grid_slices_to_show += grid_slices
-
-        elif dim == 3:
-            for axis in range(1, 4):
+        if dim == 3:
+            for axis in range(1, 2):
                 slice_idx = images_to_show[0].size()[axis + 1] // 2
                 image_slices = []
                 grid_slices = []
+                label_slices = []
+                for label in labels_to_show:
+                    label_slice = torch.flip(torch.select(label[n, :, :, :, :], axis, slice_idx), dims=[1])
+                    label_slices.append(label_slice)
                 for image in images_to_show:
                     image_slice = torch.flip(torch.select(image[n, :, :, :, :], axis, slice_idx), dims=[1])
                     image_slices.append(image_slice)
                 for phi in phis_to_show:
                     phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
                     grid_slice = torch.from_numpy(
-                        generate_deform_grid(phi_slice, axis - 1, image_slices[3], dim=3)
+                        generate_deform_grid(phi_slice, axis - 1, image_slices[2], dim=3)
                     )
                     grid_slices.append(grid_slice)
+                label_slices_to_show += label_slices
                 image_slices_to_show += image_slices
                 grid_slices_to_show += grid_slices
         else:
             raise ValueError("dimension not supported")
-
+        grids['labels'] = vision_utils.make_grid(label_slices_to_show, pad_value=1, nrow=len(labels_to_show),
+                                                 normalize=True, range=(0, 1))
         grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(images_to_show),
                                                  normalize=True, range=(0, 1))
         if len(grid_slices_to_show) > 0:

@@ -11,77 +11,58 @@ import socket
 blosc.set_nthreads(1)
 
 
-class CTCBCT(Dataset):
-    def __init__(self, dataset_mode='training', with_contours=True):
+class CBCTDataset(Dataset):
+    def __init__(self, dataset_type = 'with_contour', dataset_mode='training'):
+        super(CBCTDataset, self).__init__()
         root_folder = self.__setup_root_folder()
+        self.num_of_workers = 8
         assert (root_folder is not None)
 
-        if with_contours:
+        if dataset_type == 'with_contours':
             image_folder = os.path.join(root_folder, 'data/ct-cbct/images/with_cbct_contours')
-        else:
+        elif dataset_type == 'without_contours':
             image_folder = os.path.join(root_folder, 'data/ct-cbct/images_without_cbct_contours')
+        else:
+            raise ValueError("Dataset type wrong")
         patients = sorted(glob.glob(os.path.join(image_folder, '18227*')))
         num_of_patients = len(patients)
         num = num_of_patients // 10
-        if dataset_mode == 'training':
+        if dataset_mode == 'train':
             self.patients = patients[0:8*num]
-        elif dataset_mode == 'validation':
-            self.patients = patients[8:num: 10*num]
+        elif dataset_mode == 'validate':
+            self.patients = patients[8*num: 10*num]
         else:
             raise ValueError("Dataset {} not supported".format(dataset_mode))
 
+        self.all_cases = []
 
-        all_files = []
+        for patient_folder in self.patients:
+            cases_folder = glob.glob(os.path.join(patient_folder, "*cropped_images"))
+            for image_folder in cases_folder:
+                image_case = image_folder.split('-01_cropped_images')[0][-2:]
+                file_dict = [os.path.join(image_folder, '1900-01__Studies_image_cropped_{}.nii.gz'.format(image_case)),
+                             os.path.join(image_folder, '1900-01__Studies_SmBowel_label.nii.gz'),
+                             os.path.join(image_folder, '1900-01__Studies_StomachDuo_label.nii.gz'),
+                             os.path.join(image_folder, '1900-01__Studies_weighted_mask.nii.gz'),
+                             os.path.join(image_folder, '1900-01__Studies_weighted_mask_before_smooth.nii.gz'),
+                             os.path.join(image_folder, '19{}-01__Studies_image_normalized.nii.gz'.format(image_case)),
+                             os.path.join(image_folder, '19{}-01__Studies_SmBowel_label.nii.gz'.format(image_case)),
+                             os.path.join(image_folder, '19{}-01__Studies_StomachDuo_label.nii.gz'.format(image_case))]
+                self.all_cases.append(file_dict)
 
-        return
-        for patient in patients:
-            pati
-
-
-
-
-        tumor_folder = os.path.join(root_folder, 'pseudo/pseudo_3D/tumor')
-        mask_folder = os.path.join(root_folder, 'pseudo/pseudo_3D/mask')
-
-        tumor_files = sorted(glob.glob(os.path.join(tumor_folder, '*.nii.gz')))
-        print(len(tumor_files))
-
-        all_files = []
-        for i in range(len(tumor_files)):
-            tumor_file = tumor_files[i]
-            current_file = {
-                'image_name': tumor_file
-            }
-            tumor_name = os.path.basename(tumor_file)
-            mask_name = "{}mask.nii.gz".format(tumor_name.split('tumor', 1)[0])
-            mask_file = os.path.join(mask_folder, mask_name)
-            if os.path.isfile(mask_file):
-                current_file['mask_name'] = mask_file
-            all_files.append(current_file)
-        self.dataset_mode = dataset_mode
-        num_of_all_files = len(all_files)
-        print(num_of_all_files)
-        num = num_of_all_files // 10
-
-        if dataset_mode == 'training':
-            self.files = all_files[4 * num:10 * num]
-        elif dataset_mode == 'validation':
-            self.files = all_files[2 * num:4 * num]
-        elif dataset_mode == 'test':
-            self.files = all_files[0:2 * num]
-        else:
-            raise ValueError('Mode not supported')
-
-        self.atlas_file = os.path.join(root_folder, 'atlas_folder', 'atlas.nii.gz')
-        image_io = py_fio.ImageIO()
-        self.atlas, _, _, _ = image_io.read_to_nc_format(self.atlas_file, silent_mode=True)
-        self.images_dict = None
         self.__multi_threads_loading()
+        image_io = py_fio.ImageIO()
+        _, target_hdrc, target_spacing, _ = image_io.read_to_nc_format(self.all_cases[0][0], silent_mode=True)
+        self.target_hdrc = target_hdrc
+        self.target_spacing = target_spacing
+
+        self.sz = [192, 192, 192]  # fixed patch size
         return
 
     def __multi_threads_loading(self):
         manager = multiprocessing.Manager()
         self.files_dict = manager.dict()
+        self.roi_dict = manager.dict()
         split_list = self.__split_files()
         process = []
         for i in range(self.num_of_workers):
@@ -92,49 +73,93 @@ class CTCBCT(Dataset):
         for p in process:
             p.join()
         self.files_dict = dict(self.files_dict)
+        self.roi_dict = dict(self.roi_dict)
         print("Finish loading images")
         return
 
     def __split_files(self):
-        index_list = list(range(len(self.files)))
+        index_list = list(range(len(self.all_cases)))
         index_split = np.array_split(np.array(index_list), self.num_of_workers)
         split_list = []
         for i in range(self.num_of_workers):
-            current_list = self.files[index_split[i][0]:index_split[i][0] + len(index_split[i])]
+            current_list = self.all_cases[index_split[i][0]:index_split[i][0] + len(index_split[i])]
             split_list.append(current_list)
         return split_list
 
+
+    def __get_mid_roi(self, image):
+        r = np.any(image, axis=(1, 2))
+        c = np.any(image, axis=(0, 2))
+        z = np.any(image, axis=(0, 1))
+
+        rmin, rmax = np.where(r)[0][[0, -1]]
+        cmin, cmax = np.where(c)[0][[0, -1]]
+        zmin, zmax = np.where(z)[0][[0, -1]]
+
+        mid_point = np.array([rmin + (rmax - rmin)//2, cmin + (cmax - cmin)//2, zmin + (zmax - zmin)//2])
+        return mid_point
+
     def __load_images_and_compress(self, image_list):
-        pbar = pb.ProgressBar(widgets=[pb.Percentage(), pb.Bar(), pb.ETA()], maxval=len(image_list)).start()
+        pbar = pb.ProgressBar(widgets=[pb.Percentage(), pb.Bar(), pb.ETA()], maxval=len(image_list) * len(image_list[0])).start()
         count = 0
         image_io = py_fio.ImageIO()
-        for files in image_list:
-            image, _, _, _ = image_io.read_to_nc_format(files['image_name'], silent_mode=True)
-            image_compressed = blosc.pack_array(image)
-            self.files_dict[files['image_name']] = image_compressed
-            if 'mask_name' in files:
-                mask, _, _, _ = image_io.read_to_nc_format(files['mask_name'], silent_mode=True)
-                mask_compressed = blosc.pack_array(mask)
-                self.files_dict[files['mask_name']] = mask_compressed
-            count += 1
-            pbar.update(count)
+        for patient_cases in image_list:
+            for file_name in patient_cases:
+                if os.path.isfile(file_name):
+                    image, _, _, _ = image_io.read_to_nc_format(file_name, silent_mode=True)
+                    image_compressed = blosc.pack_array(image)
+                    if os.path.basename(file_name) == '1900-01__Studies_weighted_mask_before_smooth.nii.gz':
+                        mid_point = self.__get_mid_roi(image[0, 0, ...])
+                        self.roi_dict[file_name] = mid_point
+                    else:
+                        self.files_dict[file_name] = image_compressed
+
+                count += 1
+                pbar.update(count)
         pbar.finish()
         return
 
     def __len__(self):
-        return len(self.files)
+        return len(self.all_cases)
 
     def __getitem__(self, idx):
-        global mask
-        file_dict = self.files[idx]
-        image_compressed = self.files_dict[file_dict['image_name']]
-        image = blosc.unpack_array(image_compressed)
-        if 'mask_name' in file_dict:
-            mask_compressed = self.files_dict[file_dict['mask_name']]
-            mask = blosc.unpack_array(mask_compressed)
-            return image[0, ...], self.atlas[0, ...], mask[0, ...]
-        else:
-            return image[0, ...], self.atlas[0, ...]
+        file_dict = self.all_cases[idx]
+        weighted_mask_before_smooth_name = file_dict[4]
+        roi = self.roi_dict[weighted_mask_before_smooth_name]
+        random_shift = np.random.randint(-10, 21, size=(3,))
+        new_center = roi + random_shift
+        output_dict = {}
+        for file_name in file_dict:
+            image_case = file_name.split('-01_cropped_images')[0][-2:]
+            if os.path.isfile(file_name):
+                if os.path.basename(file_name) == "1900-01__Studies_weighted_mask_before_smooth.nii.gz":
+                    continue
+                image_compressed = self.files_dict[file_name]
+                image_full = blosc.unpack_array(image_compressed)
+                image = image_full[0, [0],
+                        max(min(new_center[0]-96, 32), 0):max(min(new_center[0]+96, 224), 192),
+                        (new_center[1]-96):(new_center[1]+96),
+                        (new_center[2]-96):(new_center[2]+96)]
+                if os.path.basename(file_name) == "1900-01__Studies_image_cropped_{}.nii.gz".format(image_case):
+                    output_dict['CT_image'] = image
+                elif os.path.basename(file_name) == "1900-01__Studies_SmBowel_label.nii.gz":
+                    output_dict['CT_SmLabel'] = image
+                elif os.path.basename(file_name) == "1900-01__Studies_StomachDuo_label.nii.gz":
+                    output_dict['CT_SdLabel'] = image
+                elif os.path.basename(file_name) == "1900-01__Studies_weighted_mask.nii.gz":
+                    output_dict['weighted_mask'] = image
+                elif os.path.basename(file_name) == "19{}-01__Studies_image_normalized.nii.gz".format(image_case):
+                    output_dict['CBCT_image'] = image
+                elif os.path.basename(file_name) == "19{}-01__Studies_SmBowel_label.nii.gz".format(image_case):
+                    output_dict['CBCT_SmLabel'] = image
+                elif os.path.basename(file_name) == "19{}-01__Studies_StomachDuo_label.nii.gz".format(image_case):
+                    output_dict['CBCT_SdLabel'] = image
+                elif os.path.basename(file_name) == "1900-01__Studies_weighted_mask_before_smooth.nii.gz":
+                    output_dict['weighted_mask_bs'] = image
+                else:
+                    raise ValueError("Wrong file name, check")
+        return output_dict
+
 
     def __setup_root_folder(self):
         hostname = socket.gethostname()

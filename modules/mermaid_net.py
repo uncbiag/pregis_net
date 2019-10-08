@@ -3,7 +3,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import losses.loss as loss
 
 import pyreg.module_parameters as pars
 import pyreg.model_factory as py_mf
@@ -15,11 +14,9 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
     _compute_low_res_image
 
 
-class PregisNet(nn.Module):
-    def __init__(self, model_config, network_mode):
-        super(PregisNet, self).__init__()
-        self.network_mode = network_mode
-        print("PregisNet Mode: {}".format(self.network_mode))
+class MermaidNet(nn.Module):
+    def __init__(self, model_config):
+        super(MermaidNet, self).__init__()
 
         self.use_bn = model_config['pregis_net']['bn']
         self.use_dp = model_config['pregis_net']['dp']
@@ -49,11 +46,20 @@ class PregisNet(nn.Module):
         self.init_mermaid_env(spacing=self.spacing)
         self.__setup_network_structure()
 
+        self.moving_image = None
+        self.moving_label1 = None
+        self.moving_label2 = None
+
+        self.target_image = None
+        self.target_label1 = None
+        self.target_label2 = None
+
+        self.weighted_mask = None
         # results to return
         self.momentum = None
-        self.recons = None
-        # self.abnormal_mask = None
-        self.warped_image = None
+        self.moving_image_and_label = None
+        self.warped_image_and_label = None
+        self.target_image_and_label = None
         self.phi = None
 
         return
@@ -97,51 +103,49 @@ class PregisNet(nn.Module):
         self.sampler = py_is.ResampleImage()
         return
 
-    def calculate_pregis_loss(self, moving, target, current_epoch, normal_mask=None):
+    def calculate_pregis_loss(self):
+        self.target_image_and_label = self.target_image.cuda()
+        if self.target_label1 is not None:
+            self.target_image_and_label = torch.cat((self.target_image_and_label, self.target_label1.cuda()), dim=1)
+        if self.target_label2 is not None:
+            self.target_image_and_label = torch.cat((self.target_image_and_label, self.target_label2.cuda()), dim=1)
+        target_image_and_label = torch.cat((self.target_image_and_label, self.weighted_mask.cuda()), dim=1)
+
+        self.moving_image_and_label = torch.cat((self.moving_image.cuda(),
+                                                 self.moving_label1.cuda(),
+                                                 self.moving_label2.cuda()),
+                                                dim=1)
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
-            I0_source=self.recons,
-            I1_target=target,
+            I0_source=self.moving_image_and_label,
+            I1_target=target_image_and_label,
             lowres_I0=None,
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
-        sim_factor = 1.0
-        if self.dim == 3 and current_epoch < 50:
-            sim_factor = 1. / (np.exp((25 - current_epoch) / 5) + 1)
-        if self.dim == 2 and current_epoch < 200:
-            sim_factor = 1. / (np.exp((100 - current_epoch) / 20) + 1)
-        all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
         loss_dict = {
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,
             'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
         }
 
-        # if normal_mask is not None:
-        # abnormal_mask = 1 - normal_mask
-        # segmentation_loss = self.segmentation_criterion(self.abnormal_mask, abnormal_mask)
-        # all_loss += self.segmentation_weight * segmentation_loss
-        # loss_dict['segmentation_loss'] = segmentation_loss
-
-        # else:
-
-        # abnormal_mask = self.abnormal_mask
-        # normal_mask = 1 - abnormal_mask
-
-        moving_normal_w_mask = torch.mul(moving, normal_mask)
-        recons_normal_w_mask = torch.mul(self.recons, normal_mask)
-
-        recons_loss = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
-        loss_dict['recons_loss'] = recons_loss
-        all_loss += self.recons_weight * recons_loss
-        loss_dict['all_loss'] = all_loss
         return loss_dict
 
-    def forward(self, input_image, target_image, mode='train'):
-        x1 = self.encoder_conv_1i(input_image)
-        x2 = self.encoder_conv_2i(target_image)
+    def forward(self, image_dict):
+        self.moving_image = image_dict['CT_image']
+        self.moving_label1 = image_dict['CT_SmLabel']
+        self.moving_label2 = image_dict['CT_SdLabel']
+
+        self.target_image = image_dict['CBCT_image']
+        if 'CBCT_SmLabel' in image_dict and 'CBCT_SdLabel' in image_dict:
+            self.target_label1 = image_dict['CBCT_SmLabel']
+            self.target_label2 = image_dict['CBCT_SdLabel']
+
+        self.weighted_mask = image_dict['weighted_mask']
+
+        x1 = self.encoder_conv_1i(self.moving_image.cuda())
+        x2 = self.encoder_conv_2i(self.target_image.cuda())
         x_l1 = torch.cat((x1, x2), dim=1)
         x = self.encoder_conv_3d(x_l1)
         x = self.encoder_conv_4(x)
@@ -168,27 +172,31 @@ class PregisNet(nn.Module):
         x = torch.cat((x_l2, x), dim=1)
         x = self.decoder1_conv_21(x)
         self.momentum = self.decoder1_conv_22o(x)
+        del x, x1, x2, x_l1, x_l2, x_l3, x_l4
 
-        warped_image, phi = self.mermaid_shoot(input_image, target_image, self.momentum)
-        self.warped_image = warped_image
-        self.phi = phi
+        moving_labels = torch.cat((self.moving_label1.cuda(), self.moving_label2.cuda()), dim=1)
+        self.mermaid_shoot(self.moving_image.cuda(), moving_labels, self.momentum)
+
         return
 
-    def set_mermaid_params(self, moving, target, momentum):
-        self.mermaid_unit.set_dictionary_to_pass_to_integrator({'I0': moving, 'I1': target})
-        self.mermaid_criterion.set_dictionary_to_pass_to_smoother({'I0': moving, 'I1': target})
+    def set_mermaid_params(self, momentum):
+        # self.mermaid_unit.set_dictionary_to_pass_to_integrator({'I0': moving, 'I1': target})
+        # self.mermaid_criterion.set_dictionary_to_pass_to_smoother({'I0': moving, 'I1': target})
         self.mermaid_unit.m = momentum
         self.mermaid_criterion.m = momentum
         return
 
-    def mermaid_shoot(self, moving, target, momentum):
-        self.set_mermaid_params(moving=moving, target=target, momentum=momentum)
+    def mermaid_shoot(self, moving_image, moving_labels, momentum):
+        self.set_mermaid_params(momentum)
         low_res_phi = self.mermaid_unit(self.lowResIdentityMap)
         desired_sz = self.identityMap.size()[2:]
-        phi, _ = self.sampler.upsample_image_to_size(low_res_phi, self.lowResSpacing, desired_sz, spline_order=1)
-        moving_warped = py_utils.compute_warped_image_multiNC(moving, phi, self.spacing, spline_order=1,
-                                                              zero_boundary=True)
-        return moving_warped, phi
+        self.phi, _ = self.sampler.upsample_image_to_size(low_res_phi, self.lowResSpacing, desired_sz, spline_order=1)
+        warped_image = py_utils.compute_warped_image_multiNC(moving_image, self.phi, self.spacing, spline_order=1,
+                                                             zero_boundary=True)
+        warped_label = py_utils.compute_warped_image_multiNC(moving_labels, self.phi, self.spacing, spline_order=0,
+                                                             zero_boundary=True)
+        self.warped_image_and_label = torch.cat((warped_image, warped_label), dim=1)
+        return
 
     def __setup_network_structure(self):
         self.encoder_conv_1i = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
@@ -212,11 +220,11 @@ class PregisNet(nn.Module):
         self.encoder_conv_11 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                           use_bn=self.use_bn, use_dp=self.use_dp)
         self.encoder_maxpool_12 = MaxPool(2, dim=self.dim, return_indieces=True)
-        self.encoder_conv_13 = ConBnRelDp(128, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.encoder_conv_13 = ConBnRelDp(128, 256, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                           use_bn=self.use_bn, use_dp=self.use_dp)
 
         # Decoder for momentum
-        self.decoder1_conv_14u = ConBnRelDp(16, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder1_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
                                             use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
         self.decoder1_conv_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)

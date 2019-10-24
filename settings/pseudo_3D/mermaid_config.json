@@ -55,15 +55,8 @@
             },
             "similarity_measure": {
                 "develop_mod_on": false,
-                "lncc": {
-                    "resol_bound":[128,64],
-                    "kernel_size_ratio":[[0.0625,0.125, 0.25], [0.25,0.5], [0.5]],
-                    "kernel_weight_ratio":[[0.1, 0.3, 0.6],[0.3,0.7],[1.0]],
-                    "stride":[[0.25,0.25,0.25],[0.25,0.25],[0.25]],
-                    "dilation":[[2,2,2],[2,2],[1]]
-                },
                 "sigma": 1.732,
-                "type": "lncc"
+                "type": "maskncc"
             },
             "spline_order": 1,
             "type": "svf_vector_momentum_map",

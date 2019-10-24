@@ -1,37 +1,46 @@
 {
     "model":{
-        "dataset": "pseudo_3D",
-        "dataset_type": "normal",
         "pregis_net":{
             "n_of_feature": 32,
             "bn": false,
             "dp": false,
             "dp_p": 0.2,
-            "recons_weight": 5,
-            "seg_weight": 10
+            "recons_weight": 5
         }
     },
     "train":{
+        "dataset": "pseudo_3D",
+        "dataset_type": "tumor",
         "n_of_epochs":500,
         "batch_size":2,
         "min_summary_period":10,
         "optimizer":{
-            "name": "ADAM",
+            "name": "ADAMW",
             "lr": 0.0005,
+            "scheduler_type": "CosineAnnealing",
             "scheduler":{
-                "name": "multistepLR",
-                "milestones":[
-                    300,
-                    400,
-                    500
-                ],
-                "gamma": 0.1
+                "multistepLR": {
+                    "milestones": [
+                        100,
+                        200,
+                        300
+                    ],
+                    "gamma": 1
+                },
+                "CosineAnnealingWarmRestarts": {
+                    "T_0": 100,
+                    "T_mult": 2
+                }
             }
         }
     },
     "validate":{
+        "dataset": "pseudo_3D",
+        "dataset_type": "tumor",
         "validate_epoch_period":1
     },
     "test":{
+        "dataset": "pseudo_3D",
+        "dataset_type": "tumor"
     }
 }

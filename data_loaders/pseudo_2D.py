@@ -12,36 +12,45 @@ blosc.set_nthreads(1)
 
 
 class Pseudo2DDataset(Dataset):
-    def __init__(self, dataset_mode='training'):
+    def __init__(self, dataset_type, dataset_mode):
         root_folder = self.__setup_root_folder()
         assert (root_folder is not None)
         self.num_of_workers = 20
 
-        tumor_folder = os.path.join(root_folder, 'pseudo/pseudo_2D/tumor')
-        mask_folder = os.path.join(root_folder, 'pseudo/pseudo_2D/mask')
+        if dataset_type == 'normal':
+            tumor_folder = os.path.join(root_folder, 'pseudo/pseudo_2D/no_tumor')
+            mask_folder = None
+        elif dataset_type == 'tumor':
+            tumor_folder = os.path.join(root_folder, 'pseudo/pseudo_2D/tumor')
+            mask_folder = os.path.join(root_folder, 'pseudo/pseudo_2D/mask')
+        else:
+            raise ValueError("dataset type wrong")
 
+        print(tumor_folder)
         tumor_files = sorted(glob.glob(os.path.join(tumor_folder, '*.nii.gz')))
         print(len(tumor_files))
 
-        all_files = []
+        all_files = []  # a list of dictionaries. Each dictionary contains image_name and mask_name
         for i in range(len(tumor_files)):
             tumor_file = tumor_files[i]
             current_file = {
-                'image_name': tumor_file
+                'image_name': tumor_file,
+                'mask_name': None
             }
-            tumor_name = os.path.basename(tumor_file)
-            mask_name = "{}mask.nii.gz".format(tumor_name.split('tumor', 1)[0])
-            mask_file = os.path.join(mask_folder, mask_name)
-            if os.path.isfile(mask_file):
-                current_file['mask_name'] = mask_file
+            if dataset_type == 'tumor':
+                tumor_name = os.path.basename(tumor_file)
+                mask_name = "{}mask.nii.gz".format(tumor_name.split('tumor', 1)[0])
+                mask_file = os.path.join(mask_folder, mask_name)
+                if os.path.isfile(mask_file):
+                    current_file['mask_name'] = mask_file
             all_files.append(current_file)
         self.dataset_mode = dataset_mode
         num_of_all_files = len(all_files)
         num = num_of_all_files // 10
 
-        if dataset_mode == 'training':
+        if dataset_mode == 'train':
             self.files = all_files[4 * num:10 * num]
-        elif dataset_mode == 'validation':
+        elif dataset_mode == 'validate':
             self.files = all_files[2 * num:4 * num]
         elif dataset_mode == 'test':
             self.files = all_files[0:2 * num]
@@ -88,7 +97,7 @@ class Pseudo2DDataset(Dataset):
             image, _, _, _ = image_io.read_to_nc_format(files['image_name'], silent_mode=True)
             image_compressed = blosc.pack_array(image)
             self.files_dict[files['image_name']] = image_compressed
-            if 'mask_name' in files:
+            if files['mask_name'] is not None:
                 mask, _, _, _ = image_io.read_to_nc_format(files['mask_name'], silent_mode=True)
                 mask_compressed = blosc.pack_array(mask)
                 self.files_dict[files['mask_name']] = mask_compressed
@@ -105,7 +114,7 @@ class Pseudo2DDataset(Dataset):
         file_dict = self.files[idx]
         image_compressed = self.files_dict[file_dict['image_name']]
         image = blosc.unpack_array(image_compressed)
-        if 'mask_name' in file_dict:
+        if file_dict['mask_name'] is not None :
             mask_compressed = self.files_dict[file_dict['mask_name']]
             mask = blosc.unpack_array(mask_compressed)
             return image[0, ...], self.atlas[0, ...], mask[0, ...]

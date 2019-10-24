@@ -1,7 +1,5 @@
 {
     "model":{
-        "dataset": "pseudo_2D",
-        "dataset_type": "normal",
         "pregis_net":{
             "n_of_feature": 32,
             "bn": false,
@@ -12,6 +10,8 @@
         }
     },
     "train":{
+        "dataset": "pseudo_2D",
+        "dataset_type": "normal",
         "n_of_epochs":1000,
         "batch_size":4,
         "min_summary_period":10,
@@ -30,8 +30,12 @@
         }
     },
     "validate":{
+        "dataset": "pseudo_2D",
+        "dataset_type": "tumor",
         "validate_epoch_period":1
     },
     "test":{
+        "dataset": "pseudo_2D",
+        "dataset_type": "tumor"
     }
 }

@@ -1,9 +1,7 @@
 from modules.layers import *
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import losses.loss as loss
 
 import pyreg.module_parameters as pars
 import pyreg.model_factory as py_mf
@@ -16,10 +14,8 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
 
 
 class PregisNet(nn.Module):
-    def __init__(self, model_config, network_mode):
+    def __init__(self, model_config):
         super(PregisNet, self).__init__()
-        self.network_mode = network_mode
-        print("PregisNet Mode: {}".format(self.network_mode))
 
         self.use_bn = model_config['pregis_net']['bn']
         self.use_dp = model_config['pregis_net']['dp']
@@ -52,7 +48,6 @@ class PregisNet(nn.Module):
         # results to return
         self.momentum = None
         self.recons = None
-        # self.abnormal_mask = None
         self.warped_image = None
         self.phi = None
 
@@ -97,12 +92,12 @@ class PregisNet(nn.Module):
         self.sampler = py_is.ResampleImage()
         return
 
-    def calculate_pregis_loss(self, moving, target, current_epoch, normal_mask=None):
+    def calculate_pregis_loss(self, moving, target, normal_mask=None, current_epoch=0):
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
-            I0_source=self.recons,
-            I1_target=target,
+            I0_source=moving,
+            I1_target=self.recons,
             lowres_I0=None,
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
@@ -119,18 +114,17 @@ class PregisNet(nn.Module):
             'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
         }
 
+        target_in_mask = torch.mul(target, normal_mask)
+        recons_in_mask = torch.mul(self.recons, normal_mask)
 
-        moving_normal_w_mask = torch.mul(moving, normal_mask)
-        recons_normal_w_mask = torch.mul(self.recons, normal_mask)
-
-        recons_loss = self.recons_criterion_L1(moving_normal_w_mask, recons_normal_w_mask)
+        recons_loss = self.recons_criterion_L1(target_in_mask, recons_in_mask)
         loss_dict['recons_loss'] = recons_loss
         all_loss += self.recons_weight * recons_loss
         loss_dict['all_loss'] = all_loss
         return loss_dict
 
-    def forward(self, input_image, target_image, mode='train'):
-        x1 = self.encoder_conv_1i(input_image)
+    def forward(self, moving_image, target_image):
+        x1 = self.ec_1(moving_image)
         x2 = self.encoder_conv_2i(target_image)
         x_l1 = torch.cat((x1, x2), dim=1)
         x = self.encoder_conv_3d(x_l1)
@@ -161,27 +155,19 @@ class PregisNet(nn.Module):
 
         # Decode Brain
         x = self.decoder2_conv_14(z)
-        x = self.decoder2_maxunpool_14(x, indices_l4)
-        # x = self.decoder2_conv_14u(z)
-        # x = torch.cat((x_l4, x), dim=1)
-        x = self.decoder2_conv_15(x)
+        x = self.decoder2_maxunpool_15(x, indices_l4)
         x = self.decoder2_conv_16(x)
-        x = self.decoder2_maxunpool_17(x, indices_l3)
-        # x = self.decoder2_conv_17u(x)
-        # x = torch.cat((x_l3, x), dim=1)
-        x = self.decoder2_conv_18(x)
+        x = self.decoder2_conv_17(x)
+        x = self.decoder2_maxunpool_18(x, indices_l3)
         x = self.decoder2_conv_19(x)
-        x = self.decoder2_maxunpool_20(x, indices_l2)
-        #x = self.decoder2_conv_20u(x)
-        # x = torch.cat((x_l2, x), dim=1)
-        # x = self.decoder2_conv_21(x)
+        x = self.decoder2_conv_20(x)
+        x = self.decoder2_maxunpool_21(x, indices_l2)
         x = self.decoder2_conv_22(x)
-        x = self.decoder2_conv_23u(x)
-        # x = torch.cat((x_l1, x), dim=1)
+        x = self.decoder2_upsample_23(x)
         x = self.decoder2_conv_24(x)
         self.recons = self.decoder2_conv_25o(x)
 
-        warped_image, phi = self.mermaid_shoot(input_image, target_image, self.momentum)
+        warped_image, phi = self.mermaid_shoot(moving_image, target_image, self.momentum)
         self.warped_image = warped_image
         self.phi = phi
         return
@@ -248,28 +234,19 @@ class PregisNet(nn.Module):
         # Decoder for Brain
         self.decoder2_conv_14 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_14 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_15 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_maxunpool_15 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.decoder2_conv_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_16 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_conv_17 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_17 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder2_conv_18 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_maxunpool_18 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.decoder2_conv_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_19 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.decoder2_conv_20 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                            use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_maxunpool_20 = MaxUnpool(kernel_size=2, dim=self.dim)
-        # self.decoder2_conv_20u = ConBnRelDp(32, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                                     use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        #self.decoder2_conv_21 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                                   use_bn=self.use_bn, use_dp=self.use_dp)
+        self.decoder2_maxunpool_21 = MaxUnpool(kernel_size=2, dim=self.dim)
         self.decoder2_conv_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu', use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder2_conv_23u = ConBnRelDp(16, 16, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu', use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+        self.decoder2_upsample_23 = nn.Upsample(scale_factor=2, mode='trilinear')
+        #self.decoder2_conv_23u = ConBnRelDp(16, 16, kernel_size=4, stride=2, dim=self.dim, activate_unit='leaky_relu', use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
         self.decoder2_conv_24 = ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.decoder2_conv_25o = ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-
-

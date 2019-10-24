@@ -61,7 +61,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
             for phi in phis_to_show:
                 phi_slice = phi[n, :, :, :]
                 grid_slice = torch.from_numpy(
-                    generate_deform_grid(phi_slice, background_image=image_slices[3], dim=2)
+                    generate_deform_grid(phi_slice, background_image=image_slices[2], dim=2)
                 )
                 grid_slices.append(grid_slice)
             grid_slices_to_show += grid_slices
@@ -77,7 +77,7 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
                 for phi in phis_to_show:
                     phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
                     grid_slice = torch.from_numpy(
-                        generate_deform_grid(phi_slice, axis - 1, image_slices[3], dim=3)
+                        generate_deform_grid(phi_slice, axis - 1, image_slices[2], dim=3)
                     )
                     grid_slices.append(grid_slice)
                 image_slices_to_show += image_slices
@@ -86,53 +86,9 @@ def make_image_summary(images_to_show, phis_to_show, n_samples=1):
             raise ValueError("dimension not supported")
 
         grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(images_to_show),
-                                                 normalize=True, range=(0, 1))
+                                                 normalize=True, range=(-1, 1))
         if len(grid_slices_to_show) > 0:
             grids['grid'] = vision_utils.make_grid(grid_slices_to_show, pad_value=1, nrow=dim)
-    return grids
-
-
-def make_image_summary_old(moving_image, target_image, moving_warped, moving_warped_recons, deform_field=None,
-                           n_samples=1):
-    n_samples = min(n_samples, moving_image.size()[0])
-    grids = {}
-    dim = len(moving_image.shape) - 2
-
-    image_slices = []
-    deform_grid_slices = []
-    grids = {}
-    for n in range(n_samples):
-        if dim == 2:
-            moving_image_slice = moving_image[n, :, :, :]
-            target_image_slice = target_image[n, :, :, :]
-            moving_warped_slice = moving_warped[n, :, :, :]
-            moving_warped_recons_slice = moving_warped_recons[n, :, :, :]
-            diff_image_slice = torch.abs(moving_warped_slice - moving_warped_recons_slice)
-            if deform_field is not None:
-                deform_field_slice = deform_field[n, :, :, :]
-                deform_grid_slice = torch.from_numpy(
-                    generate_deform_grid(deform_field_slice, background_image=moving_warped_slice)
-                )
-                deform_grid_slices += [deform_grid_slice]
-
-            image_slices += [moving_image_slice, target_image_slice, moving_warped_slice, moving_warped_recons_slice,
-                             diff_image_slice]
-        elif dim == 3:
-            for axis in range(1, 4):
-                slice_indx = moving_image.size()[axis + 1] // 2
-                moving_image_slice = torch.flip(torch.select(moving_image[n, :, :, :, :], axis, slice_indx), dims=[1])
-                target_image_slice = torch.flip(torch.select(target_image[n, :, :, :, :], axis, slice_indx), dims=[1])
-                moving_warped_slice = torch.flip(torch.select(moving_warped[n, :, :, :, ], axis, slice_indx), dims=[1])
-                moving_warped_recons_slice = torch.flip(
-                    torch.select(moving_warped_recons[n, :, :, :, ], axis, slice_indx), dims=[1])
-                diff_image_slice = torch.abs(moving_warped_slice - moving_warped_recons_slice)
-                image_slices += [moving_image_slice, target_image_slice, moving_warped_slice,
-                                 moving_warped_recons_slice, diff_image_slice]
-        else:
-            raise ValueError("dimension not supported")
-        grids['images'] = vision_utils.make_grid(image_slices, pad_value=1, nrow=5, normalize=True, range=(0, 1))
-        grids['images_un'] = vision_utils.make_grid(image_slices, pad_value=1, nrow=5)
-        # grids['deform_grid'] = vision_utils.make_grid(deform_grid_slices, pad_value=1, nrow=1)
     return grids
 
 

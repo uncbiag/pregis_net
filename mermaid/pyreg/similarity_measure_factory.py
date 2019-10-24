@@ -132,6 +132,44 @@ class SimilarityMeasure(with_metaclass(ABCMeta, object)):
         return self.sigma
 
 
+class MaskNCCSimilarity(SimilarityMeasure):
+    """
+    last channel is for cost function masking (in target space)
+    """
+
+    def __init__(self, spacing, params):
+        super(MaskNCCSimilarity, self).__init__(spacing, params)
+
+    def compute_similarity_multiC(self, I0, I1, I0Source=None, phi=None):
+        sz0 = I0.size()[0]
+        sz1 = I1.size()[0]
+        assert (sz0 == sz1 - 1)
+        mask = I1[-1, ...]
+
+        sim = 0.
+        for nrC in range(sz0):
+            sim = sim + self.compute_similarity(I0[nrC, ...], I1[nrC, ...], mask=mask)
+
+        return sim / sz0
+
+    def compute_similarity(self, I0, I1, mask):
+        indices = (mask > 0.1)  # consider intensity greater than 0.1
+        I0_v = I0[indices]
+        I1_v = I1[indices]
+
+        I0mean = I0_v.mean()
+        I1mean = I1_v.mean()
+
+        if I0mean == 0 and I1mean == 0:
+            nccSqr = torch.tensor(1)
+        elif I0mean == 0 or I1mean == 0:
+            nccSqr = torch.tensor(0)
+        else:
+            nccSqr = (((I0_v - I0mean.expand_as(I0_v)) * (I1_v - I1mean.expand_as(I1_v))).mean() ** 2) / \
+                     (((I0_v - I0mean) ** 2).mean() * ((I1_v - I1mean) ** 2).mean())
+        return AdaptVal((1 - nccSqr) / self.sigma ** 2)
+
+
 class CustomizedSimilarity(SimilarityMeasure):
     """
     second channel is mask for cost function masking (both spaces)
@@ -147,7 +185,7 @@ class CustomizedSimilarity(SimilarityMeasure):
         assert (sz0 == sz1 or sz0 == sz1 - 1)
         num_of_labels = sz0 - 1
         mask = None
-        if sz0 == sz1 - 1 :
+        if sz0 == sz1 - 1:
             mask = I1[-1, ...]
 
         sim = 0
@@ -973,7 +1011,8 @@ class SimilarityMeasureFactory(object):
             'lncc': LNCCSimilarity,  # LocalizedNCCSimilarity,
             'omt': OptimalMassTransportSimilarity,
             'custncc': CustomizedSimilarity,
-            'custlncc': CustLNCCSimilarity
+            'custlncc': CustLNCCSimilarity,
+            'maskncc': MaskNCCSimilarity
         }
         """currently implemented similiarity measures"""
 

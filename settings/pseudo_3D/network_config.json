@@ -11,9 +11,9 @@
     "train":{
         "dataset": "pseudo_3D",
         "dataset_type": "tumor",
-        "n_of_epochs":500,
-        "batch_size":2,
-        "min_summary_period":10,
+        "n_of_epochs":10,
+        "batch_size":1,
+        "min_summary_period":1,
         "optimizer":{
             "name": "ADAMW",
             "lr": 0.0005,

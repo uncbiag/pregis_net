@@ -30,6 +30,7 @@ class MermaidNet(nn.Module):
         self.mermaid_config_file = model_config['mermaid_config_file']
         self.mermaid_unit = None
         self.spacing = 1. / (np.array(self.img_sz[2:]) - 1)
+        print("mermaid spacing {}".format(self.spacing))
 
         # members that will be set during mermaid initialization
         self.similarity_measure_type = None

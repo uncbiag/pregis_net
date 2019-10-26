@@ -105,6 +105,7 @@ class AdamW(optim.Optimizer):
 
         return loss
 
+
 class CosineAnnealingWarmRestarts(torch.optim.lr_scheduler._LRScheduler):
     r"""Set the learning rate of each parameter group using a cosine annealing
     schedule, where :math:`\eta_{max}` is set to the initial lr, :math:`T_{cur}`
@@ -174,6 +175,34 @@ class CosineAnnealingWarmRestarts(torch.optim.lr_scheduler._LRScheduler):
             param_group['lr'] = lr
 
 
+class JointScheduler(object):
+    def __init__(self, mermaid_scheduler, recons_scheduler):
+        self.mermaid_scheduler = mermaid_scheduler
+        self.recons_scheduler = recons_scheduler
+
+    def step(self, epoch=None):
+        self.mermaid_scheduler.step(epoch)
+        self.recons_scheduler.step(epoch)
+
+
+class JointOptimizer(object):
+    def __init__(self, mermaid_optimizer, recons_optimizer):
+        self.mermaid_optimizer = mermaid_optimizer
+        self.recons_optimizer = recons_optimizer
+
+    def zero_grad(self):
+        self.mermaid_optimizer.zero_grad()
+        self.recons_optimizer.zero_grad()
+
+    def step(self):
+        self.mermaid_optimizer.step()
+        self.recons_optimizer.step()
+
+    def load_state_dict(self, mermaid_opt_dict, recons_opt_dict):
+        self.mermaid_optimizer.load_state_dict(mermaid_opt_dict)
+        self.recons_optimizer.load_state_dict(recons_opt_dict)
+
+
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find('Conv') != -1:
@@ -186,7 +215,7 @@ def create_model(network_config, network_mode):
         model = PregisNet(network_config)
     elif network_mode == 'mermaid':
         model = MermaidNet(network_config)
-    elif network_mode =='recons':
+    elif network_mode == 'recons':
         model = ReconsNet(network_config)
     model.cuda()
     model.apply(weights_init)
@@ -236,31 +265,55 @@ def create_dataloader(network_config):
     model_config['dim'] = len(target_image.shape[2:])
     model_config['target_hdrc'] = target_hdrc
     model_config['target_spacing'] = target_spacing
+    print(model_config['target_spacing'])
     return train_data_loader, validate_data_loader
 
 
-def create_optimizer(config, model):
+def create_optimizer(config, model, network_mode=None):
     method = config['optimizer']['name']
     scheduler_type = config['optimizer']['scheduler_type']
     lr = config['optimizer']['lr']
     if method == "ADAM":
-        optimizer = optim.Adam(model.parameters(), lr=lr)
+        optimizer_to_use = optim.Adam
     elif method == "ADAMW":
-        optimizer = AdamW(model.parameters(), lr=lr)
+        optimizer_to_use = AdamW
     else:
         raise ValueError("optimizer not supported")
+
+    if network_mode == 'pregis':
+        mermaid_optimizer = optimizer_to_use(model.mermaid_net.parameters(), lr=lr)
+        recons_optimizer = optimizer_to_use(model.recons_net.parameters(), lr=lr)
+        optimizer = JointOptimizer(mermaid_optimizer, recons_optimizer)
+    else:
+        optimizer = optimizer_to_use(model.parameters(), lr=lr)
 
     if scheduler_type == 'multistepLR':
         milestones = list(config['optimizer']['scheduler']['milestones'])
         gamma = config['optimizer']['scheduler']['gamma']
-        scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
+        if network_mode == 'pregis':
+            mermaid_scheduler = lr_scheduler.MultiStepLR(optimizer.mermaid_optimizer, milestones=milestones, gamma=gamma)
+            recons_scheduler = lr_scheduler.MultiStepLR(optimizer.recons_optimizer, milestones=milestones, gamma=gamma)
+            scheduler = JointScheduler(mermaid_scheduler, recons_scheduler)
+        else:
+            scheduler = lr_scheduler.MultiStepLR(optimizer, milestones=milestones, gamma=gamma)
     elif scheduler_type == 'CosineAnnealingWarmRestarts':
         T_0 = config['optimizer']['scheduler']['CosineAnnealingWarmRestarts']['T_0']
         T_mult = config['optimizer']['scheduler']['CosineAnnealingWarmRestarts']['T_mult']
-        scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mult)
+        if network_mode == 'pregis':
+            mermaid_scheduler = CosineAnnealingWarmRestarts(optimizer.mermaid_optimizer, T_0=T_0, T_mult=T_mult)
+            recons_scheduler = CosineAnnealingWarmRestarts(optimizer.recons_optimizer, T_0=T_0, T_mult=T_mult)
+            scheduler = JointScheduler(mermaid_scheduler, recons_scheduler)
+        else:
+            scheduler = CosineAnnealingWarmRestarts(optimizer, T_0=T_0, T_mult=T_mult)
+
     elif scheduler_type == 'CosineAnnealing':
         T_max = config['n_of_epochs']
-        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_max)
+        if network_mode == 'pregis':
+            mermaid_scheduler = lr_scheduler.CosineAnnealingLR(optimizer.mermaid_optimizer, T_max=T_max)
+            recons_scheduler = lr_scheduler.CosineAnnealingLR(optimizer.recons_optimizer, T_max=T_max)
+            scheduler = JointScheduler(mermaid_scheduler, recons_scheduler)
+        else:
+            scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=T_max)
     else:
         raise ValueError("scheduler not supported")
     return optimizer, scheduler

@@ -11,7 +11,7 @@ from utils import registration_method
 
 import pyreg.fileio as py_fio
 import pyreg.utils as py_utils
-from modules.pregis_net import PregisNet
+from modules.pregis_net_old import PregisNet
 from torch.utils.data import DataLoader, Dataset
 from torch.autograd import Variable
 import torchvision.utils as utils

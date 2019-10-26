@@ -9,12 +9,11 @@ from utils.visualize import make_image_summary
 import torch
 torch.backends.cudnn.benchmark=True
 
-class TrainPregis:
+class TrainNetwork:
     def __init__(self):
         self.dataset = 'pseudo_3D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
         self.network_mode = 'pregis'
-        self.training_mode = 'alter' # alter or joint
 
         self.time = None
         # specify continue training or new training
@@ -76,15 +75,15 @@ class TrainPregis:
                                                     "settings/{}/mermaid_config.json".format(self.dataset))
             if self.network_mode == 'pregis':
                 # need to load pretrained mermaid and recons
-                mermaid_network_name = "model_mermaid_time_20191022-233724_initLR_0.0005_sigma_1.732_recons_5"
-                recons_network_name = "model_recons_time_20191022-125440_initLR_0.0005_sigma_1.732_recons_5"
+                mermaid_network_name = ""
+                recons_network_name = ""
                 mermaid_network_folder = os.path.join(os.path.dirname(__file__),
                                                       "tmp_models/mermaid_net/{}".format(mermaid_network_name))
-                recons_network_folder = os.path.join(os.path.dirname(__file__),
+                recons_network_folder = os.path.join(os.path.basename(__file__),
                                                    "tmp_models/recons_net/{}".format(recons_network_name))
                 self.network_file = {
                     "mermaid": os.path.join(mermaid_network_folder, "best_eval.pth.tar"),
-                    "recons": os.path.join(recons_network_folder, "best_eval.pth.tar"),
+                    "recons": os.path.join(recons_network_folder, "best_eval.path.tar"),
                 }
 
         with open(self.network_config_file) as f:
@@ -167,43 +166,28 @@ class TrainPregis:
 
         if self.network_file:
             # resume training or loading mermaid and recons net for pregis net training
-            if self.is_continue:
-                # only one model in network_file
-                for model_name in self.network_file:
-                    # NEED MORE TEST
-                    model_file = self.network_file[model_name]
-                    checkpoint = torch.load(model_file)
-                    if 'min_val_loss' in checkpoint and model_name == self.network_mode:
-                        min_val_loss = checkpoint['min_val_loss']
-                    if 'epoch' in checkpoint and model_name == self.network_mode:
-                        current_epoch = checkpoint['epoch'] + 1
-                    if 'optimizer_state_dict' in checkpoint and model_name == self.network_mode:
-                        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-                    try:
-                        if model_name == 'pregis':
-                            self.model.load_state_dict(checkpoint['model_state_dict'])
-                        elif model_name == 'mermaid':
-                            self.model.load_state_dict(checkpoint['model_state_dict'])
-                        elif model_name == 'recons':
-                            self.model.load_state_dict(checkpoint['model_state_dict'])
-                        else:
-                            raise ValueError("Wrong")
-                    except:
-                        print("Model load FAILED!!!!")
 
-            else:
-                assert(self.network_mode == 'pregis')
-                assert('mermaid' in self.network_file and 'recons' in self.network_file)
-                print("Loading mermaid net and recons net for pregis net")
-                mermaid_model_file = self.network_file['mermaid']
-                mermaid_checkpoint = torch.load(mermaid_model_file)
-                if 'optimizer_state_dict' in mermaid_checkpoint:
-                    self.optimizer.mermaid_optimizer.load_state_dict(mermaid_checkpoint['optimizer_state_dict'])
-
-                recons_model_file = self.network_file['recons']
-                recons_checkpoint = torch.load(recons_model_file)
-                if 'optimizer_state_dict' in recons_checkpoint:
-                    self.optimizer.recons_optimizer.load_state_dict(recons_checkpoint['optimizer_state_dict'])
+            for model_name in self.network_file:
+                # NEED MORE TEST
+                model_file = self.network_file[model_name]
+                checkpoint = torch.load(model_file)
+                if 'min_val_loss' in checkpoint and model_name == self.network_mode:
+                    min_val_loss = checkpoint['min_val_loss']
+                if 'epoch' in checkpoint and model_name == self.network_mode:
+                    current_epoch = checkpoint['epoch'] + 1
+                if 'optimizer_state_dict' in checkpoint and model_name == self.network_mode:
+                    self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+                try:
+                    if model_name == 'pregis':
+                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                    elif model_name == 'mermaid':
+                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                    elif model_name == 'recons':
+                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                    else:
+                        raise ValueError("Wrong")
+                except:
+                    print("Model load FAILED!!!!")
 
         print("Current epoch: {}".format(current_epoch))
         while current_epoch < n_epochs:
@@ -244,8 +228,11 @@ class TrainPregis:
                         epoch_loss_dict[loss_key] += loss_dict[loss_key].item()
 
                 if (i + 1) % summary_batch_period == 0:  # print summary every k batches
-                    to_print = "====>{:0d}, {:0d}, all_loss:{:.6f}".format(current_epoch + 1, global_step,
-                                                                           epoch_loss_dict['all_loss'] / summary_batch_period)
+                    to_print = "====>{:0d}, {:0d}, lr:{:.8f}, all_loss:{:.6f}".format(current_epoch + 1, global_step,
+                                                                                      self.optimizer.param_groups[0][
+                                                                                          'lr'],
+                                                                                      epoch_loss_dict[
+                                                                                          'all_loss'] / summary_batch_period)
 
                     for loss_key in epoch_loss_dict:
                         writer.add_scalar('training/training_{}'.format(loss_key),
@@ -379,5 +366,5 @@ class TrainPregis:
 
 
 if __name__ == '__main__':
-    network = TrainPregis()
+    network = TrainNetwork()
     network.train_model()

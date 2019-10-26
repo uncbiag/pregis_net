@@ -205,6 +205,12 @@ class TrainPregis:
                 if 'optimizer_state_dict' in recons_checkpoint:
                     self.optimizer.recons_optimizer.load_state_dict(recons_checkpoint['optimizer_state_dict'])
 
+                try:
+                    self.model.mermaid_net.load_state_dict(mermaid_checkpoint['model_state_dict'])
+                    self.model.recons_net.load_state_dict(recons_checkpoint['model_state_dict'])
+                except:
+                    print("Model load FAILED")
+
         print("Current epoch: {}".format(current_epoch))
         while current_epoch < n_epochs:
             epoch_loss_dict = {

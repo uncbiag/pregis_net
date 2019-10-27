@@ -142,6 +142,6 @@ class Pseudo3DDataset(Dataset):
             root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net'
         elif hostname == 'biag-w05.cs.unc.edu':
             root_folder = '/playpen1/xhs400/Research/data/data_for_pregis_net'
-        elif hostname == 'biag-lambda1.cs.unc.edu':
+        elif 'lambda' in hostname:
             root_folder = '/playpen/xhs400/Research/data/data_for_pregis_net'
         return root_folder

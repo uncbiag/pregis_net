@@ -5,7 +5,7 @@
             "bn": false,
             "dp": false,
             "dp_p": 0.2,
-            "recons_weight": 5
+            "recons_weight": 10
         }
     },
     "train":{
@@ -16,7 +16,7 @@
         "min_summary_period":10,
         "optimizer":{
             "name": "ADAMW",
-            "lr": 0.0005,
+            "lr": 0.0002,
             "scheduler_type": "CosineAnnealing",
             "scheduler":{
                 "multistepLR": {

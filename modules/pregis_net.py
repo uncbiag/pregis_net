@@ -19,12 +19,17 @@ class PregisNet(nn.Module):
         loss_from_mermaid = self.mermaid_net.calculate_evaluation_loss(moving, self.recons, normal_mask, disp_field)
         loss_from_recons = self.recons_net.calculate_evaluation_loss(target, normal_mask)
         loss_dict = {
+            'mermaid_all_loss': loss_from_mermaid['mermaid_all_loss'],
+            'mermaid_reg_loss': loss_from_mermaid['mermaid_reg_loss'],
+            'mermaid_sim_loss': loss_from_mermaid['mermaid_sim_loss'],
             'eval_loss': loss_from_mermaid['eval_loss'],
             'tumor_disp_loss': loss_from_mermaid['tumor_disp_loss'],
             'near_disp_loss': loss_from_mermaid['near_disp_loss'],
             'far_disp_loss': loss_from_mermaid['far_disp_loss'],
-            'recons_loss': loss_from_recons['recons_loss']
+            'recons_loss': loss_from_recons['recons_loss'],
+            'all_loss': loss_from_mermaid['all_loss'] + loss_from_recons['all_loss']
         }
+
         return loss_dict
 
     def calculate_loss(self, moving, target, normal_mask):

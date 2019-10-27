@@ -7,14 +7,17 @@ import socket
 from tensorboardX import SummaryWriter
 from utils.visualize import make_image_summary
 import torch
-torch.backends.cudnn.benchmark=True
+
+torch.backends.cudnn.benchmark = True
+
 
 class TrainPregis:
     def __init__(self):
         self.dataset = 'pseudo_3D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
         self.network_mode = 'pregis'
-        self.training_mode = 'alter' # alter or joint
+        self.from_scratch = False
+        self.training_mode = 'joint'  # alter or joint
 
         self.time = None
         # specify continue training or new training
@@ -74,14 +77,14 @@ class TrainPregis:
 
             self.mermaid_config_file = os.path.join(os.path.dirname(__file__),
                                                     "settings/{}/mermaid_config.json".format(self.dataset))
-            if self.network_mode == 'pregis':
+            if not self.from_scratch:
                 # need to load pretrained mermaid and recons
                 mermaid_network_name = "model_mermaid_time_20191022-233724_initLR_0.0005_sigma_1.732_recons_5"
                 recons_network_name = "model_recons_time_20191022-125440_initLR_0.0005_sigma_1.732_recons_5"
                 mermaid_network_folder = os.path.join(os.path.dirname(__file__),
                                                       "tmp_models/mermaid_net/{}".format(mermaid_network_name))
                 recons_network_folder = os.path.join(os.path.dirname(__file__),
-                                                   "tmp_models/recons_net/{}".format(recons_network_name))
+                                                     "tmp_models/recons_net/{}".format(recons_network_name))
                 self.network_file = {
                     "mermaid": os.path.join(mermaid_network_folder, "best_eval.pth.tar"),
                     "recons": os.path.join(recons_network_folder, "best_eval.pth.tar"),
@@ -118,6 +121,10 @@ class TrainPregis:
 
             recons_weight = self.network_config['model']['pregis_net']['recons_weight']
             my_name = my_name + '_recons_{}'.format(recons_weight)
+            if self.from_scratch:
+                my_name = my_name + '_FromScratch'
+            else:
+                my_name = my_name + '_NotFromScratch'
 
             self.network_folder = os.path.join(os.path.dirname(__file__), 'tmp_models',
                                                '{}_net'.format(self.network_mode),
@@ -169,6 +176,7 @@ class TrainPregis:
             # resume training or loading mermaid and recons net for pregis net training
             if self.is_continue:
                 # only one model in network_file
+                print("Loading from previously trained model")
                 for model_name in self.network_file:
                     # NEED MORE TEST
                     model_file = self.network_file[model_name]
@@ -192,8 +200,8 @@ class TrainPregis:
                         print("Model load FAILED!!!!")
 
             else:
-                assert(self.network_mode == 'pregis')
-                assert('mermaid' in self.network_file and 'recons' in self.network_file)
+                assert (self.network_mode == 'pregis')
+                assert ('mermaid' in self.network_file and 'recons' in self.network_file)
                 print("Loading mermaid net and recons net for pregis net")
                 mermaid_model_file = self.network_file['mermaid']
                 mermaid_checkpoint = torch.load(mermaid_model_file)
@@ -204,7 +212,6 @@ class TrainPregis:
                 recons_checkpoint = torch.load(recons_model_file)
                 if 'optimizer_state_dict' in recons_checkpoint:
                     self.optimizer.recons_optimizer.load_state_dict(recons_checkpoint['optimizer_state_dict'])
-
                 try:
                     self.model.mermaid_net.load_state_dict(mermaid_checkpoint['model_state_dict'])
                     self.model.recons_net.load_state_dict(recons_checkpoint['model_state_dict'])
@@ -251,7 +258,8 @@ class TrainPregis:
 
                 if (i + 1) % summary_batch_period == 0:  # print summary every k batches
                     to_print = "====>{:0d}, {:0d}, all_loss:{:.6f}".format(current_epoch + 1, global_step,
-                                                                           epoch_loss_dict['all_loss'] / summary_batch_period)
+                                                                           epoch_loss_dict[
+                                                                               'all_loss'] / summary_batch_period)
 
                     for loss_key in epoch_loss_dict:
                         writer.add_scalar('training/training_{}'.format(loss_key),
@@ -260,20 +268,18 @@ class TrainPregis:
                     images_to_show = [moving_image, target_image]
                     phis_to_show = []
 
-                    if self.network_mode == "pregis" or self.network_mode == "mermaid":
-                        phis_to_show.append(self.model.phi.detach())
-                        images_to_show.append(self.model.warped_image.detach())
-                        to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}".format(
-                            epoch_loss_dict['mermaid_all_loss'] / summary_batch_period,
-                            epoch_loss_dict['mermaid_sim_loss'] / summary_batch_period,
-                            epoch_loss_dict['mermaid_reg_loss'] / summary_batch_period
-                        )
+                    phis_to_show.append(self.model.phi.detach())
+                    images_to_show.append(self.model.warped_image.detach())
+                    to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}".format(
+                        epoch_loss_dict['mermaid_all_loss'] / summary_batch_period,
+                        epoch_loss_dict['mermaid_sim_loss'] / summary_batch_period,
+                        epoch_loss_dict['mermaid_reg_loss'] / summary_batch_period
+                    )
 
-                    if self.network_mode == "pregis" or self.network_mode == "recons":
-                        images_to_show.append(self.model.recons.detach())
-                        to_print += ', recons_loss:{:.6f}'.format(
-                            epoch_loss_dict['recons_loss'] / summary_batch_period
-                        )
+                    images_to_show.append(self.model.recons.detach())
+                    to_print += ', recons_loss:{:.6f}'.format(
+                        epoch_loss_dict['recons_loss'] / summary_batch_period
+                    )
                     if mask_image is not None:
                         images_to_show.append(mask_image)
                     image_summary = make_image_summary(images_to_show, phis_to_show)
@@ -289,10 +295,10 @@ class TrainPregis:
                         'all_loss': 0.0
                     }
                     writer.flush()
+
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
                 with torch.no_grad():
                     self.model.eval()
-
                     eval_loss_dict = {
                         'mermaid_all_loss': 0.0,
                         'mermaid_reg_loss': 0.0,
@@ -311,15 +317,11 @@ class TrainPregis:
                         mask_image = eval_images[2].cuda()
                         disp_field = eval_images[3].cuda()
 
-                        if self.network_mode == "mermaid" or self.network_mode == "pregis":
-                            self.model(moving_image, target_image)
-                            loss_dict = self.model.calculate_evaluation_loss(moving_image, target_image, mask_image,
-                                                                             disp_field)
-                        elif self.network_mode == "recons":
-                            self.model(target_image)
-                            loss_dict = self.model.calculate_evaluation_loss(target_image, mask_image)
-                        else:
-                            raise ValueError("Network Mode Error")
+                        self.model(moving_image, target_image)
+                        loss_dict = self.model.calculate_evaluation_loss(moving_image,
+                                                                         target_image,
+                                                                         mask_image,
+                                                                         disp_field)
 
                         for loss_key in eval_loss_dict:
                             if loss_key in loss_dict:
@@ -337,17 +339,15 @@ class TrainPregis:
                     images_to_show = [moving_image, target_image]
                     phis_to_show = []
 
-                    if self.network_mode == "pregis" or self.network_mode == "mermaid":
-                        phis_to_show.append(self.model.phi.detach())
-                        images_to_show.append(self.model.warped_image.detach())
-                        to_print = to_print + ", sim_loss:{:.6f}".format(
-                            eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch
-                        )
-                    if self.network_mode == "pregis" or self.network_mode == "recons":
-                        images_to_show.append(self.model.recons.detach())
-                        to_print += ', recons_loss:{:.6f}'.format(
-                            eval_loss_dict['recons_loss'] / val_iters_per_epoch
-                        )
+                    phis_to_show.append(self.model.phi.detach())
+                    images_to_show.append(self.model.warped_image.detach())
+                    to_print = to_print + ", sim_loss:{:.6f}".format(
+                        eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch
+                    )
+                    images_to_show.append(self.model.recons.detach())
+                    to_print += ', recons_loss:{:.6f}'.format(
+                        eval_loss_dict['recons_loss'] / val_iters_per_epoch
+                    )
                     images_to_show.append(mask_image)
 
                     image_summary = make_image_summary(images_to_show, phis_to_show)
@@ -368,7 +368,9 @@ class TrainPregis:
                         torch.save({'min_val_loss': min_val_loss,
                                     'epoch': current_epoch,
                                     'model_state_dict': self.model.state_dict(),
-                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    'mermaid_optimizer_state_dict': self.optimizer.mermaid_optimizer.state_dict(),
+                                    'recons_optimizer_state_dict': self.optimizer.recons_optimizer.state_dict()
+                                    },
                                    save_file)
 
                     if (current_epoch + 1) % 50 == 0:
@@ -376,12 +378,14 @@ class TrainPregis:
                         torch.save({'min_val_loss': min_val_loss,
                                     'epoch': current_epoch,
                                     'model_state_dict': self.model.state_dict(),
-                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    'mermaid_optimizer_state_dict': self.optimizer.mermaid_optimizer.state_dict(),
+                                    'recons_optimizer_state_dict': self.optimizer.recons_optimizer.state_dict()
+                                    },
                                    save_file)
                     writer.flush()
 
             current_epoch = current_epoch + 1
-            writer.close()
+        writer.close()
 
 
 if __name__ == '__main__':

@@ -14,6 +14,7 @@ import pyreg.fileio as py_fio
 from modules.pregis_net import PregisNet
 from modules.mermaid_net import MermaidNet
 from modules.recons_net import ReconsNet
+from modules.pregis_net_single import PregisNetSingle
 from torch.utils.data import DataLoader
 
 from data_loaders import pseudo_2D as pseudo_2D_dataset
@@ -217,6 +218,8 @@ def create_model(network_config, network_mode):
         model = MermaidNet(network_config)
     elif network_mode == 'recons':
         model = ReconsNet(network_config)
+    elif network_mode == 'pregis_single':
+        model = PregisNetSingle(network_config)
     model.cuda()
     model.apply(weights_init)
     return model

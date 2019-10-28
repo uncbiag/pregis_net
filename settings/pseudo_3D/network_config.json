@@ -16,7 +16,7 @@
         "min_summary_period":10,
         "optimizer":{
             "name": "ADAMW",
-            "lr": 0.0002,
+            "lr": 0.0005,
             "scheduler_type": "CosineAnnealing",
             "scheduler":{
                 "multistepLR": {

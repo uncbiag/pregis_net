@@ -7,13 +7,16 @@ import socket
 from tensorboardX import SummaryWriter
 from utils.visualize import make_image_summary
 import torch
-torch.backends.cudnn.benchmark=True
+
+torch.backends.cudnn.benchmark = True
+
 
 class TrainNetwork:
     def __init__(self):
         self.dataset = 'pseudo_3D'
         # network_mode selected from  'mermaid', 'recons', 'pregis'
-        self.network_mode = 'pregis'
+        self.network_mode = 'mermaid'
+        print("Network mode: {}".format(self.network_mode))
 
         self.time = None
         # specify continue training or new training
@@ -80,7 +83,7 @@ class TrainNetwork:
                 mermaid_network_folder = os.path.join(os.path.dirname(__file__),
                                                       "tmp_models/mermaid_net/{}".format(mermaid_network_name))
                 recons_network_folder = os.path.join(os.path.basename(__file__),
-                                                   "tmp_models/recons_net/{}".format(recons_network_name))
+                                                     "tmp_models/recons_net/{}".format(recons_network_name))
                 self.network_file = {
                     "mermaid": os.path.join(mermaid_network_folder, "best_eval.pth.tar"),
                     "recons": os.path.join(recons_network_folder, "best_eval.path.tar"),
@@ -215,7 +218,7 @@ class TrainNetwork:
                     self.model(moving_image, target_image)
                     loss_dict = self.model.calculate_loss(moving_image, target_image, mask_image)
                 elif self.network_mode == "recons":
-                    self.model(target_image)
+                    self.model(moving_image, target_image)
                     loss_dict = self.model.calculate_loss(target_image, mask_image)
                 else:
                     raise ValueError("Network Mode Error")
@@ -297,7 +300,7 @@ class TrainNetwork:
                             loss_dict = self.model.calculate_evaluation_loss(moving_image, target_image, mask_image,
                                                                              disp_field)
                         elif self.network_mode == "recons":
-                            self.model(target_image)
+                            self.model(moving_image, target_image)
                             loss_dict = self.model.calculate_evaluation_loss(target_image, mask_image)
                         else:
                             raise ValueError("Network Mode Error")

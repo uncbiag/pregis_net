@@ -1,9 +1,7 @@
 from modules.layers import *
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
-import losses.loss as loss
 
 import pyreg.module_parameters as pars
 import pyreg.model_factory as py_mf
@@ -15,9 +13,10 @@ from utils.registration_method import _get_low_res_size_from_size, _get_low_res_
     _compute_low_res_image
 
 
-class MermaidNet(nn.Module):
+class PregisNetSingle(nn.Module):
     def __init__(self, model_config):
-        super(MermaidNet, self).__init__()
+        super(PregisNetSingle, self).__init__()
+
         self.use_bn = model_config['pregis_net']['bn']
         self.use_dp = model_config['pregis_net']['dp']
         self.dim = model_config['dim']
@@ -25,15 +24,13 @@ class MermaidNet(nn.Module):
         self.batch_size = self.img_sz[0]
 
         self.recons_weight = model_config['pregis_net']['recons_weight']
-        self.l1_loss = nn.L1Loss(reduction='mean').cuda()
+        self.recons_criterion_L1 = nn.L1Loss(reduction='mean').cuda()
 
         self.mermaid_config_file = model_config['mermaid_config_file']
         self.mermaid_unit = None
         self.spacing = 1. / (np.array(self.img_sz[2:]) - 1)
-        print("mermaid spacing {}".format(self.spacing))
 
         # members that will be set during mermaid initialization
-        self.similarity_measure_type = None
         self.use_map = None
         self.map_low_res_factor = None
         self.lowResSize = None
@@ -48,6 +45,7 @@ class MermaidNet(nn.Module):
 
         # results to return
         self.momentum = None
+        self.recons = None
         self.warped_image = None
         self.phi = None
 
@@ -56,10 +54,9 @@ class MermaidNet(nn.Module):
     def init_mermaid_env(self, spacing):
         params = pars.ParameterDict()
         params.load_JSON(self.mermaid_config_file)
-        # sm_factory = smf.SimilarityMeasureFactory(self.spacing)
-        # self.sim_criterion = sm_factory.create_similarity_measure(params['model']['registration_model'])
+        sm_factory = smf.SimilarityMeasureFactory(self.spacing)
+        self.sim_criterion = sm_factory.create_similarity_measure(params['model']['registration_model'])
         model_name = params['model']['registration_model']['type']
-        self.similarity_measure_type = params['model']['registration_model']['similarity_measure']['type']
         self.use_map = params['model']['deformation']['use_map']
         self.map_low_res_factor = params['model']['deformation'][('map_low_res_factor', None, 'low_res_factor')]
         compute_similarity_measure_at_low_res = params['model']['deformation'][
@@ -87,15 +84,14 @@ class MermaidNet(nn.Module):
                 lowres_id = py_utils.identity_map_multiN(self.lowResSize, self.lowResSpacing)
                 self.lowResIdentityMap = torch.from_numpy(lowres_id).cuda()
 
-        # SVFVectorMomentumMapNet, LDDMMShootingVectorMomentumMapNet
+        # SVFVectorMometumMapNet, LDDMMShootingVectorMomentumMapNet
         self.mermaid_unit = model.cuda()
         self.mermaid_criterion = criterion
         self.sampler = py_is.ResampleImage()
         return
 
     def calculate_evaluation_loss(self, moving, target, normal_mask, disp_field):
-        # same for training
-        loss_dict = self.calculate_loss(moving, target, normal_mask)
+        loss_dict = self.calculate_loss(moving, target, normal_mask, current_epoch=1000)
         far_indices = (normal_mask > 1.5)
         near_indices = ((normal_mask < 1.5) & (normal_mask > 0.5))
         tumor_indices = (normal_mask < 0.5)
@@ -115,11 +111,9 @@ class MermaidNet(nn.Module):
         loss_dict['eval_loss'] = tumor_disp_loss + near_disp_loss + 0.5 * far_disp_loss
         return loss_dict
 
-    def calculate_loss(self, moving, target, normal_mask):
-        moving_n = (moving + 1) / 2.
-        target_n = (target + 1) / 2.
-        if self.similarity_measure_type == 'maskncc':
-            target_n = torch.cat((target_n, normal_mask), dim=1)
+    def calculate_loss(self, moving, target, normal_mask, current_epoch=0):
+        moving_n = (moving+1) / 2.
+        target_n = (self.recons + 1) / 2.
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
@@ -129,48 +123,75 @@ class MermaidNet(nn.Module):
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
+        sim_factor = 1.0
+        if self.dim == 3 and current_epoch < 50:
+            sim_factor = 1. / (np.exp((50 - current_epoch) / 10) + 1)
+        if self.dim == 2 and current_epoch < 200:
+            sim_factor = 1. / (np.exp((100 - current_epoch) / 20) + 1)
+        all_loss = (sim_factor * mermaid_sim_loss + mermaid_reg_loss) / self.batch_size
         loss_dict = {
-            'all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_all_loss': mermaid_all_loss / self.batch_size,
             'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,
             'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
         }
-        loss_dict['all_loss'] = loss_dict['mermaid_all_loss']
 
+        normal_indices = (normal_mask > 0.5)
+        target_in_mask = target[normal_indices]
+        recons_in_mask = self.recons[normal_indices]
+        recons_loss = self.recons_criterion_L1(target_in_mask, recons_in_mask)
+        loss_dict['recons_loss'] = recons_loss
+        all_loss += self.recons_weight * recons_loss
+        loss_dict['all_loss'] = all_loss
         return loss_dict
 
-    def forward(self, input_image, target_image):
-        x1 = self.ec_1(input_image)
-        x2 = self.ec_2(target_image)
+    def forward(self, moving_image, target_image):
+        x1 = self.ec_1i(moving_image)
+        x2 = self.ec_2i(target_image)
         x_l1 = torch.cat((x1, x2), dim=1)
-        x = self.ec_3(x_l1)
+        x, indices_l1 = self.ec_3(x_l1)
         x = self.ec_4(x)
         x_l2 = self.ec_5(x)
-        x = self.ec_6(x_l2)
+        x, indices_l2 = self.ec_6(x_l2)
         x = self.ec_7(x)
         x_l3 = self.ec_8(x)
-        x = self.ec_9(x_l3)
+        x, indices_l3 = self.ec_9(x_l3)
         x = self.ec_10(x)
         x_l4 = self.ec_11(x)
-        x = self.ec_12(x_l4)
+        x, indices_l4 = self.ec_12(x_l4)
         z = self.ec_13(x)
 
         # Decode Momentum
-        x = self.dc_14(z)
+        x = self.dc1_14(z)
         x = torch.cat((x_l4, x), dim=1)
-        x = self.dc_15(x)
-        x = self.dc_16(x)
-        x = self.dc_17(x)
+        x = self.dc1_15(x)
+        x = self.dc1_16(x)
+        x = self.dc1_17(x)
         x = torch.cat((x_l3, x), dim=1)
-        x = self.dc_18(x)
-        x = self.dc_19(x)
-        x = self.dc_20(x)
+        x = self.dc1_18(x)
+        x = self.dc1_19(x)
+        x = self.dc1_20(x)
         x = torch.cat((x_l2, x), dim=1)
-        x = self.dc_21(x)
-        x = self.dc_22(x)
-        self.momentum = self.dc_23(x)
+        x = self.dc1_21(x)
+        x = self.dc1_22(x)
+        self.momentum = self.dc1_23(x)
 
-        warped_image, phi = self.mermaid_shoot(input_image, target_image, self.momentum)
+        # Decode Brain
+        x = self.dc2_14(z)
+        x = self.dc2_15(x, indices_l4)
+        x = self.dc2_16(x)
+        x = self.dc2_17(x)
+        x = self.dc2_18(x, indices_l3)
+        x = self.dc2_19(x)
+        x = self.dc2_20(x)
+        x = self.dc2_21(x, indices_l2)
+        x = self.dc2_22(x)
+        x = self.dc2_23(x)
+        x = self.dc2_24(x, indices_l1)
+        x = self.dc2_25(x)
+        x = self.dc2_26(x)
+        self.recons = self.dc2_27(x)
+
+        warped_image, phi = self.mermaid_shoot(moving_image, target_image, self.momentum)
         self.warped_image = warped_image
         self.phi = phi
         return
@@ -190,51 +211,74 @@ class MermaidNet(nn.Module):
         desired_sz = self.identityMap.size()[2:]
         phi, _ = self.sampler.upsample_image_to_size(low_res_phi, self.lowResSpacing, desired_sz, spline_order=1)
         moving_warped_n = py_utils.compute_warped_image_multiNC(moving_n, phi, self.spacing, spline_order=1,
-                                                                zero_boundary=True)
+                                                              zero_boundary=True)
         moving_warped = moving_warped_n * 2 - 1
         return moving_warped, phi
 
     def __setup_network_structure(self):
-        self.ec_1 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_2 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_3 = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+        self.ec_1i = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                use_bn=self.use_bn, use_dp=self.use_dp)
+        self.ec_2i = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                use_bn=self.use_bn, use_dp=self.use_dp)
+        self.ec_3 = MaxPool(2, dim=self.dim, return_indieces=True)
         self.ec_4 = ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_5 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_6 = MaxPool(2, dim=self.dim)
+        self.ec_6 = MaxPool(2, dim=self.dim, return_indieces=True)
         self.ec_7 = ConBnRelDp(32, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_8 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_9 = MaxPool(2, dim=self.dim)
+        self.ec_9 = MaxPool(2, dim=self.dim, return_indieces=True)
         self.ec_10 = ConBnRelDp(64, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                 use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_11 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                 use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_12 = MaxPool(2, dim=self.dim)
+        self.ec_12 = MaxPool(2, dim=self.dim, return_indieces=True)
         self.ec_13 = ConBnRelDp(128, 256, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                 use_bn=self.use_bn, use_dp=self.use_dp)
 
-        # decoder for momentum
-        self.dc_14 = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.dc_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.dc_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.dc_17 = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.dc_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.dc_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.dc_20 = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.dc_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.dc_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-        self.dc_23 = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+        # Decoder for momentum
+        self.dc1_14 = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+        self.dc1_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc1_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc1_17 = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+        self.dc1_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc1_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc1_20 = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+        self.dc1_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc1_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+        self.dc1_23 = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+
+        # Decoder for Brain
+        self.dc2_14 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_15 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.dc2_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_17 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_18 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.dc2_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_20 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_21 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.dc2_22 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_23 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_24 = MaxUnpool(kernel_size=2, dim=self.dim)
+        self.dc2_25 = ConBnRelDp(16, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                                 use_bn=self.use_bn, use_dp=self.use_dp)
+        self.dc2_26 = ConBnRelDp(16, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+        self.dc2_27 = ConBnRelDp(8, 1, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')

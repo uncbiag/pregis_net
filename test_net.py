@@ -1,5 +1,5 @@
 from modules.unet import ReconsNet
-from modules.pregis_net_old import PregisNet
+from modules.pregis_net_single import PregisNet
 from modules.vae import VaeNet
 
 import numpy as np

@@ -1,0 +1,43 @@
+{
+    "model":{
+        "pregis_net":{
+            "n_of_feature": 32,
+            "bn": false,
+            "dp": false,
+            "dp_p": 0.2,
+            "recons_weight": 5.0,
+            "seg_weight": 5.0
+        }
+    },
+    "train":{
+        "dataset": "ct_cbct",
+        "dataset_type": "with_contours",
+        "n_of_epochs":1000,
+        "batch_size":1,
+        "min_summary_period":8,
+        "optimizer":{
+            "name": "ADAMW",
+            "lr": 0.0002,
+            "scheduler_type": "CosineAnnealing",
+            "scheduler":{
+                "multistepLR": {
+                    "milestones": [
+                        300,
+                        500,
+                        800
+                    ],
+                    "gamma": 1
+                },
+                "CosineAnnealingWarmRestarts": {
+                    "T_0": 500,
+                    "T_mult": 2
+                }
+            }
+        }
+    },
+    "validate":{
+        "dataset": "ct_cbct",
+        "dataset_type": "with_contours",
+        "validate_epoch_period":1
+    }
+}

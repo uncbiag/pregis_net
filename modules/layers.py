@@ -13,7 +13,6 @@ class MaxPool(nn.Module):
             max_pool = nn.MaxPool3d
         else:
             raise ValueError("Dimension error")
-
         self.max_pool = max_pool(kernel_size, stride=2, return_indices=return_indieces)
         return
 
@@ -64,9 +63,9 @@ class ConBnRelDp(nn.Module):
         else:
             raise ValueError("Dimension can only be 1, 2 or 3.")
         if not reverse:
-            self.conv = conv(in_ch, out_ch, kernel_size, stride, padding, groups=1, dilation=1)
+            self.conv = conv(in_ch, out_ch, kernel_size, stride, padding, groups=group, dilation=dilation)
         else:
-            self.conv = convT(in_ch, out_ch, kernel_size, stride, padding, groups=1, dilation=1)
+            self.conv = convT(in_ch, out_ch, kernel_size, stride, padding, groups=group, dilation=dilation)
 
         self.batch_norm = batch_norm(out_ch) if use_bn else False
         if activate_unit == 'relu':

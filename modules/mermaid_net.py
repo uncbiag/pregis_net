@@ -1,17 +1,16 @@
 from modules.layers import *
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import numpy as np
 
 import pyreg.module_parameters as pars
 import pyreg.model_factory as py_mf
 import pyreg.utils as py_utils
-import pyreg.image_sampling as py_is
 import pyreg.similarity_measure_factory as smf
 from pyreg.external_variable import *
 from utils.registration_method import _get_low_res_size_from_size, _get_low_res_spacing_from_spacing, \
-    _compute_low_res_image
+     get_resampled_image
+from functools import partial
 
 
 class MermaidNet(nn.Module):
@@ -24,11 +23,7 @@ class MermaidNet(nn.Module):
         self.img_sz = model_config['img_sz']
         self.batch_size = self.img_sz[0]
 
-        self.recons_weight = model_config['pregis_net']['recons_weight']
-        self.recons_criterion_L1 = nn.L1Loss(reduction='mean').cuda()
-        self.segmentation_weight = model_config['pregis_net']['seg_weight']
-        self.segmentation_criterion = nn.BCELoss(reduction='mean').cuda()
-
+        self.step = 3
         self.mermaid_config_file = model_config['mermaid_config_file']
         self.mermaid_unit = None
         self.spacing = 1. / (np.array(self.img_sz[2:]) - 1)
@@ -41,26 +36,17 @@ class MermaidNet(nn.Module):
         self.identityMap = None
         self.lowResIdentityMap = None
         self.mermaid_criterion = None
-        self.sampler = None
+        self.lowRes_fn = None
+        self.sim_criterion = None
 
         self.init_mermaid_env(spacing=self.spacing)
-        self.__setup_network_structure()
+        self.__setup_network_structure__()
 
-        self.moving_image = None
-        self.moving_label1 = None
-        self.moving_label2 = None
-
-        self.target_image = None
-        self.target_label1 = None
-        self.target_label2 = None
-
-        self.weighted_mask = None
         # results to return
-        self.momentum = None
-        self.moving_image_and_label = None
-        self.warped_image_and_label = None
-        self.target_image_and_label = None
         self.phi = None
+        self.loss_dict = None
+        self.warped_image = None
+        self.warped_labels = None
 
         return
 
@@ -72,6 +58,7 @@ class MermaidNet(nn.Module):
         model_name = params['model']['registration_model']['type']
         self.use_map = params['model']['deformation']['use_map']
         self.map_low_res_factor = params['model']['deformation'][('map_low_res_factor', None, 'low_res_factor')]
+        assert self.map_low_res_factor == 0.5
         compute_similarity_measure_at_low_res = params['model']['deformation'][
             ('compute_similarity_measure_at_low_res', False, 'to compute Sim at lower resolution')]
 
@@ -100,143 +87,180 @@ class MermaidNet(nn.Module):
         # SVFVectorMometumMapNet, LDDMMShootingVectorMomentumMapNet
         self.mermaid_unit = model.cuda()
         self.mermaid_criterion = criterion
-        self.sampler = py_is.ResampleImage()
+        self.lowRes_fn = partial(get_resampled_image, spacing=self.spacing, desired_size=self.lowResSize,
+                                 zero_boundary=False, identity_map=self.lowResIdentityMap)
         return
 
-    def calculate_pregis_loss(self):
-        self.target_image_and_label = self.target_image.cuda()
-        if self.target_label1 is not None:
-            self.target_image_and_label = torch.cat((self.target_image_and_label, self.target_label1.cuda()), dim=1)
-        if self.target_label2 is not None:
-            self.target_image_and_label = torch.cat((self.target_image_and_label, self.target_label2.cuda()), dim=1)
-        target_image_and_label = torch.cat((self.target_image_and_label, self.weighted_mask.cuda()), dim=1)
+    def __calculate_dice_socre(self, predicted_label, target_label, mask):
+        roi_indices = (mask > 0.5)
+        predicted_in_mask = predicted_label[roi_indices]
+        target_in_mask = target_label[roi_indices]
+        intersection = (predicted_in_mask * target_in_mask) .sum()
+        smooth = 1.
+        dice = (2 * intersection + smooth) / (predicted_in_mask.sum() + target_in_mask.sum() + smooth)
+        return dice
 
-        self.moving_image_and_label = torch.cat((self.moving_image.cuda(),
-                                                 self.moving_label1.cuda(),
-                                                 self.moving_label2.cuda()),
-                                                dim=1)
+    def __calculate_dice_score_multiN(self, predicted_labels, target_labels, mask):
+        sm_label_dice = 0.0
+        sd_label_dice = 0.0
+        for batch in range(self.batch_size):
+            sm_label_dice += self.__calculate_dice_socre(predicted_labels[batch, 0, ...],
+                                                         target_labels[batch, 0, ...],
+                                                         mask[batch, 0, ...])
+            sd_label_dice += self.__calculate_dice_socre(predicted_labels[batch, 1, ...],
+                                                         target_labels[batch, 1, ...],
+                                                         mask[batch, 0, ...])
+        return sm_label_dice, sd_label_dice
+
+    def calculate_train_loss(self, moving_image_and_label, target_image_and_label):
         mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss = self.mermaid_criterion(
             phi0=self.identityMap,
             phi1=self.phi,
-            I0_source=self.moving_image_and_label,
+            I0_source=moving_image_and_label,
             I1_target=target_image_and_label,
             lowres_I0=None,
             variables_from_forward_model=self.mermaid_unit.get_variables_to_transfer_to_loss_function(),
             variables_from_optimizer=None
         )
-        loss_dict = {
-            'mermaid_all_loss': mermaid_all_loss / self.batch_size,
-            'mermaid_sim_loss': mermaid_sim_loss / self.batch_size,
-            'mermaid_reg_loss': mermaid_reg_loss / self.batch_size
+
+        return mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss
+
+    def forward(self, ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel):
+
+        ct_labels = torch.cat((ct_sblabel, ct_sdlabel), dim=1)
+        cb_labels = torch.cat((cb_sblabel, cb_sdlabel), dim=1)
+
+        # moving: CBCT, target: CT
+        cb_image_and_label = cb_image
+        cb_image_and_label = torch.cat((cb_image_and_label, cb_sblabel), dim=1)
+        cb_image_and_label = torch.cat((cb_image_and_label, cb_sdlabel), dim=1)
+
+        ct_image_and_label = ct_image
+        ct_image_and_label = torch.cat((ct_image_and_label, ct_sblabel), dim=1)
+        ct_image_and_label = torch.cat((ct_image_and_label, ct_sdlabel), dim=1)
+        ct_image_and_label = torch.cat((ct_image_and_label, roi_label), dim=1)
+
+        # First step of multi-step network:
+        # moving image is the warped image
+        # identity map is the init phi
+
+        warped_image = cb_image
+        init_map = self.identityMap
+
+        self.loss_dict = {
+            'all_loss':  0.,
+            'mermaid_all_loss': 0.,
+            'mermaid_sim_loss': 0.,
+            'mermaid_reg_loss': 0.,
+            'dice_SmLabel': 0.,
+            'dice_SdLabel': 0.,
         }
+        for i in range(self.step):
+            # momentum is obtained from network (warped image to target image)
+            momentum = self.__network_forward__(moving_image=warped_image, target_image_and_label=ct_image_and_label)
+            # warped image is obtained by resampling the moving image
+            warped_image, warped_labels, phi = self.__mermaid_shoot__(moving_image=cb_image, moving_labels=cb_labels,
+                                                                  momentum=momentum, init_map=init_map)
+            init_map = phi
+            self.phi = phi
+            self.warped_image = warped_image
+            self.warped_labels = warped_labels
+            all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=cb_image_and_label,
+                                                                     target_image_and_label=ct_image_and_label)
+            self.loss_dict['mermaid_all_loss'] += all_loss / self.batch_size
+            self.loss_dict['mermaid_sim_loss'] += sim_loss / self.batch_size
+            self.loss_dict['mermaid_reg_loss'] += reg_loss / self.batch_size
 
-        return loss_dict
 
-    def forward(self, image_dict):
-        self.moving_image = image_dict['CT_image']
-        self.moving_label1 = image_dict['CT_SmLabel']
-        self.moving_label2 = image_dict['CT_SdLabel']
+        self.loss_dict['all_loss'] = self.loss_dict['mermaid_all_loss']
 
-        self.target_image = image_dict['CBCT_image']
-        if 'CBCT_SmLabel' in image_dict and 'CBCT_SdLabel' in image_dict:
-            self.target_label1 = image_dict['CBCT_SmLabel']
-            self.target_label2 = image_dict['CBCT_SdLabel']
-
-        self.weighted_mask = image_dict['weighted_mask']
-
-        x1 = self.encoder_conv_1i(self.moving_image.cuda())
-        x2 = self.encoder_conv_2i(self.target_image.cuda())
-        x_l1 = torch.cat((x1, x2), dim=1)
-        x = self.encoder_conv_3d(x_l1)
-        x = self.encoder_conv_4(x)
-        x_l2 = self.encoder_conv_5(x)
-        x, indices_l2 = self.encoder_maxpool_6(x_l2)
-        x = self.encoder_conv_7(x)
-        x_l3 = self.encoder_conv_8(x)
-        x, indices_l3 = self.encoder_maxpool_9(x_l3)
-        x = self.encoder_conv_10(x)
-        x_l4 = self.encoder_conv_11(x)
-        x, indices_l4 = self.encoder_maxpool_12(x_l4)
-        z = self.encoder_conv_13(x)
-
-        # Decode Momentum
-        x = self.decoder1_conv_14u(z)
-        x = torch.cat((x_l4, x), dim=1)
-        x = self.decoder1_conv_15(x)
-        x = self.decoder1_conv_16(x)
-        x = self.decoder1_conv_17u(x)
-        x = torch.cat((x_l3, x), dim=1)
-        x = self.decoder1_conv_18(x)
-        x = self.decoder1_conv_19(x)
-        x = self.decoder1_conv_20u(x)
-        x = torch.cat((x_l2, x), dim=1)
-        x = self.decoder1_conv_21(x)
-        self.momentum = self.decoder1_conv_22o(x)
-        del x, x1, x2, x_l1, x_l2, x_l3, x_l4
-
-        moving_labels = torch.cat((self.moving_label1.cuda(), self.moving_label2.cuda()), dim=1)
-        self.mermaid_shoot(self.moving_image.cuda(), moving_labels, self.momentum)
+        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(ct_labels,
+                                                                          self.warped_labels.detach(),
+                                                                          roi_label)
+        self.loss_dict['dice_SmLabel'] = sm_label_dice / self.batch_size
+        self.loss_dict['dice_SdLabel'] = sd_label_dice / self.batch_size
 
         return
 
-    def set_mermaid_params(self, momentum):
-        # self.mermaid_unit.set_dictionary_to_pass_to_integrator({'I0': moving, 'I1': target})
-        # self.mermaid_criterion.set_dictionary_to_pass_to_smoother({'I0': moving, 'I1': target})
+    def __mermaid_shoot__(self, moving_image, moving_labels, momentum, init_map):
+        # obtain transformation map from momentum
+        # warp image and labels
         self.mermaid_unit.m = momentum
         self.mermaid_criterion.m = momentum
-        return
-
-    def mermaid_shoot(self, moving_image, moving_labels, momentum):
-        self.set_mermaid_params(momentum)
-        low_res_phi = self.mermaid_unit(self.lowResIdentityMap)
+        low_res_phi = self.mermaid_unit(self.lowRes_fn(init_map))
         desired_sz = self.identityMap.size()[2:]
-        self.phi, _ = self.sampler.upsample_image_to_size(low_res_phi, self.lowResSpacing, desired_sz, spline_order=1)
-        warped_image = py_utils.compute_warped_image_multiNC(moving_image, self.phi, self.spacing, spline_order=1,
-                                                             zero_boundary=True)
-        warped_label = py_utils.compute_warped_image_multiNC(moving_labels, self.phi, self.spacing, spline_order=0,
-                                                             zero_boundary=True)
-        self.warped_image_and_label = torch.cat((warped_image, warped_label), dim=1)
-        return
+        phi = get_resampled_image(low_res_phi,
+                                  self.lowResSpacing,
+                                  desired_sz, 1, zero_boundary=False, identity_map=self.identityMap)
 
-    def __setup_network_structure(self):
-        self.encoder_conv_1i = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_2i = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_3d = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_4 = ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                         use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_5 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                         use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_maxpool_6 = MaxPool(2, dim=self.dim, return_indieces=True)
-        self.encoder_conv_7 = ConBnRelDp(32, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                         use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_8 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                         use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_maxpool_9 = MaxPool(2, dim=self.dim, return_indieces=True)
-        self.encoder_conv_10 = ConBnRelDp(64, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_conv_11 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
-        self.encoder_maxpool_12 = MaxPool(2, dim=self.dim, return_indieces=True)
-        self.encoder_conv_13 = ConBnRelDp(128, 256, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                          use_bn=self.use_bn, use_dp=self.use_dp)
+        warped_image = py_utils.compute_warped_image_multiNC(moving_image, phi, self.spacing, spline_order=1,
+                                                             zero_boundary=True)
+        warped_labels = py_utils.compute_warped_image_multiNC(moving_labels, phi, self.spacing, spline_order=0,
+                                                              zero_boundary=True)
+        return warped_image, warped_labels, phi
 
-        # Decoder for momentum
-        self.decoder1_conv_14u = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                            use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder1_conv_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder1_conv_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder1_conv_17u = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                            use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder1_conv_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder1_conv_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                           use_bn=self.use_bn, use_dp=self.use_dp)
-        self.decoder1_conv_20u = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                            use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        self.decoder1_conv_21 = ConBnRelDp(64, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-        self.decoder1_conv_22o = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
+    def __network_forward__(self, moving_image, target_image_and_label):
+        d1_1 = self.down_path_1_1(moving_image)
+        d1_2 = self.down_path_1_2(target_image_and_label)
+        d1 = torch.cat((d1_1, d1_2), 1)
+        d2_1 = self.down_path_2_1(d1)
+        d2_2 = self.down_path_2_2(d2_1)
+        d2_2 = d2_1 + d2_2
+        d2_3 = self.down_path_2_3(d2_2)
+        d2_3 = d2_1 + d2_3
+        d4_1 = self.down_path_4_1(d2_3)
+        d4_2 = self.down_path_4_2(d4_1)
+        d4_2 = d4_1 + d4_2
+        d4_3 = self.down_path_4_3(d4_2)
+        d4_3 = d4_2 + d4_3
+        d8_1 = self.down_path_8_1(d4_3)
+        d8_2 = self.down_path_8_2(d8_1)
+        d8_2 = d8_1 + d8_2
+        d8_3 = self.down_path_8_3(d8_2)
+        d8_3 = d8_2 + d8_3
+        d16_1 = self.down_path_16_1(d8_3)
+        d16_2 = self.down_path_16_2(d16_1)
+        d16_2 = d16_1 + d16_2
+
+        u8_1 = self.up_path_8_1(d16_2)
+        u8_2 = self.up_path_8_2(torch.cat((d8_3, u8_1), 1))
+        u8_3 = self.up_path_8_3(u8_2)
+        u8_3 = u8_2 + u8_3
+        u4_1 = self.up_path_4_1(u8_3)
+        u4_2 = self.up_path_4_2(torch.cat((d4_3, u4_1), 1))
+        u4_3 = self.up_path_4_3(u4_2)
+        u4_3 = u4_2 + u4_3
+        u2_1 = self.up_path_2_1(u4_3)
+        u2_2 = self.up_path_2_2(torch.cat((d2_3, u2_1), 1))
+        output = self.up_path_2_3(u2_2)
+
+        return output
+
+    def __setup_network_structure__(self):
+        self.down_path_1_1 = ConBnRelDp(1, 8, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
+        self.down_path_1_2 = ConBnRelDp(4, 8, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
+        self.down_path_2_1 = ConBnRelDp(16, 32, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=False)
+        self.down_path_2_2 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
+        self.down_path_2_3 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_4_1 = ConBnRelDp(32, 64, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_4_2 = ConBnRelDp(64, 64, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_4_3 = ConBnRelDp(64, 64, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_8_1 = ConBnRelDp(64, 128, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_8_2 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_8_3 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_16_1 = ConBnRelDp(128, 256, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+        self.down_path_16_2 = ConBnRelDp(256, 256, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
+
+        # output_size = strides * (input_size-1) + kernel_size - 2*padding
+        self.up_path_8_1 = ConBnRelDp(256, 128, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
+                                       reverse=True)
+        self.up_path_8_2 = ConBnRelDp(128 + 128, 128, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
+        self.up_path_8_3 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
+        self.up_path_4_1 = ConBnRelDp(128, 64, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
+                                       reverse=True)
+        self.up_path_4_2 = ConBnRelDp(64 + 64, 32, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
+        self.up_path_4_3 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
+        self.up_path_2_1 = ConBnRelDp(32, 32, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
+                                       reverse=True)
+        self.up_path_2_2 = ConBnRelDp(32 + 32, 16, 3, stride=1, activate_unit='None', same_padding=True)
+        self.up_path_2_3 = ConBnRelDp(16, 3, 3, stride=1, activate_unit='None', same_padding=True)

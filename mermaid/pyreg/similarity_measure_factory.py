@@ -472,6 +472,8 @@ class LNCCSimilarity(SimilarityMeasure):
 
         self.num_scale = len(self.kernel)
         self.kernel_sz = [[k for _ in range(self.dim)] for k in self.kernel]
+        print(self.stride)
+        print(self.kernel_sz)
         self.step = [[max(int((ksz + 1) * self.stride[scale_id]), 1) for ksz in self.kernel_sz[scale_id]] for scale_id
                      in range(self.num_scale)]
         self.filter = [torch.ones([1, 1] + self.kernel_sz[scale_id]).cuda() for scale_id in range(self.num_scale)]
@@ -529,12 +531,8 @@ class LNCCSimilarity(SimilarityMeasure):
             cross = input_target_local_sum - input_local_sum * target_local_sum / numel
             input_local_var = input_2_local_sum - input_local_sum ** 2 / numel
             target_local_var = target_2_local_sum - target_local_sum ** 2 / numel
-
+            torch.clamp(lncc, 0, 1)
             lncc = (cross * cross) / (input_local_var * target_local_var + 1e-5)
-            lncc = torch.clamp(lncc, min=0.0, max=1.0)
-            if torch.max(lncc) > 1 or torch.min(lncc) < 0:
-                print(torch.max(lncc))
-                print(torch.min(lncc))
             lncc = 1 - lncc.mean()
             lncc_total += lncc * self.weight[scale_id]
 
@@ -542,66 +540,6 @@ class LNCCSimilarity(SimilarityMeasure):
 
 
 class CustLNCCSimilarity(SimilarityMeasure):
-    """
-    This is an generalized lncc, we implement multi-scale ( means resolution) multi kernel( means size of neighborhood) LNCC
-
-    :param: resol_bound : type list,  resol_bound[0]> resol_bound[1] >... resol_bound[end]
-    :param: kernel_size_ratio: type list,  the ratio of the current input size
-    :param: kernel_weight_ratio: type list,  the weight ratio of each kernel size, should sum to 1
-    :param: stride: type_list, the stride between each pixel that would compute its lncc
-    :param: dilation: type_list
-
-    settings in json:
-
-
-    "similarity_measure": {
-                "develop_mod_on": false,
-                "sigma": 0.5,
-                "type": "lncc",
-                "lncc":{
-                    "resol_bound":[-1],
-                    "kernel_size_ratio":[[0.25]],
-                    "kernel_weight_ratio":[[1.0]],
-                    "stride":[0.25,0.25,0.25],
-                    "dilation":[1]
-                }
-
-
-
-
-    multi_scale_multi_kernel
-    eg.    "resol_bound":[64,32],
-           "kernel_size_ratio":[[0.0625,0.125, 0.25], [0.25,0.5], [0.5]],
-            "kernel_weight_ratio":[[0.1,0.3,0.6],[0.3,0.7],[1.0]],
-            "stride":[0.25,0.25,0.25],
-            "dilation":[1,2,2] #[2,1,1]
-
-    single_scale_single_kernel
-                    "resol_bound":[-1],
-                    "kernel_size_ratio":[[0.25]],
-                    "kernel_weight_ratio":[[1.0]],
-                    "stride":[0.25],
-                    "dilation":[1]
-
-
-    Multi-scale is controlled by "resol_bound", e.g resol_bound = [128, 64], it means if input size>128, then it would compute multi-kernel
-    lncc designed for large image size,  if 64<input_size<128, then it would compute multi-kernel lncc desiged for mid-size image, otherwise,
-    it would compute the multi-kernel lncc designed for small image.
-    Attention! we call it multi-scale just because it is designed for multi-scale registration or segmentation problem.
-    ONLY ONE scale would be activated during computing the similarity, which depends on the current input size.
-
-    At each scale, corresponding multi-kernel lncc is implemented, here multi-kernel means lncc with different window sizes
-    Loss = w1*lncc_win1 + w2*lncc_win2 ... + wn*lncc_winn, where /sum(wi) =1
-    for example. when (image size) S>128, three windows sizes can be used, namely S/16, S/8, S/4.
-    for easy notation, we use img_ratio to refer window size, the example here use the parameter [1./16,1./8,1.4]
-
-    In implementation, we compute lncc by calling convolution function, so in this case, the [S/16, S/8, S/4] refers
-      to the kernel size of convolution fucntion.  Intuitively,  we would have another two parameters,
-    stride and dilation.  For each window size (W) , we recommand using W/4 as stride. In extreme case the stride can be 1, but
-    can large increase computation.   The dilation expand the reception field, set dilation as 2 would physically twice the window size.
-
-    """
-
 
     def __init__(self, spacing, params):
         super(CustLNCCSimilarity, self).__init__(spacing, params)
@@ -653,18 +591,14 @@ class CustLNCCSimilarity(SimilarityMeasure):
         else:
             raise ValueError(" Only 1-3d support")
 
-    
-    
     def compute_similarity_multiC(self, I0, I1, I0Source=None, phi=None):
         sz0 = I0.size()[0]
         sz1 = I1.size()[0]
-        assert (sz0 == sz1 or sz0 == sz1 - 1)
+        assert (sz0 == sz1 - 1)
 
         # last channel of target image is similarity mask
         num_of_labels = sz0 - 1
-        mask = None
-        if (sz0 == sz1 - 1):
-            mask = I1[-1, ...]
+        mask = I1[-1, ...]
 
         sim = 0.0
         sim = sim + self.compute_similarity(I0[0, ...], I1[0, ...], isLabel=False, similarity_mask=None)
@@ -676,8 +610,6 @@ class CustLNCCSimilarity(SimilarityMeasure):
                                                     similarity_mask=mask)
 
         return AdaptVal(sim / self.sigma ** 2)
-
-
 
     def compute_similarity(self, I0, I1, I0Source=None, phi=None, isLabel=False, similarity_mask=None):
         """

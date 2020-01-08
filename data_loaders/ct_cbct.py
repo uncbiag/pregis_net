@@ -1,171 +1,276 @@
-from __future__ import print_function, division
-from torch.utils.data import Dataset, DataLoader
+import math
+import os
+import random
 
-import glob
-from utils.utils import *
-import progressbar as pb
+import numpy as np
+from torch.utils.data import Dataset
+import SimpleITK as sitk
+from scipy import ndimage
 import blosc
-import multiprocessing
-import socket
 
 blosc.set_nthreads(1)
 
+class R21RegDataset(Dataset):
+    def __init__(self, settings, mode):
+        super(R21RegDataset, self).__init__()
+        self.mode = mode
+        if self.mode == 'train':
+            print("Reading {}".format(settings.train_list))
+            with open(settings.train_list, 'r') as f:
+                self.img_list = [line.strip() for line in f]
+        elif self.mode == 'test':
+            print("Reading {}".format(settings.test_list))
+            with open(settings.test_list, 'r') as f:
+                self.img_list = [line.strip() for line in f]
+        print("Processing {} datas".format(len(self.img_list)))
+        self.input_D = settings.input_D
+        self.input_H = settings.input_H
+        self.input_W = settings.input_W
 
-class CBCTDataset(Dataset):
-    def __init__(self, dataset_type = 'with_contour', dataset_mode='training'):
-        super(CBCTDataset, self).__init__()
-        root_folder = self.__setup_root_folder()
-        self.num_of_workers = 8
-        assert (root_folder is not None)
+        self.img_dict = {}
 
-        if dataset_type == 'with_contours':
-            image_folder = os.path.join(root_folder, 'data/ct-cbct/images/with_cbct_contours')
-        elif dataset_type == 'without_contours':
-            image_folder = os.path.join(root_folder, 'data/ct-cbct/images_without_cbct_contours')
-        else:
-            raise ValueError("Dataset type wrong")
-        patients = sorted(glob.glob(os.path.join(image_folder, '18227*')))
-        num_of_patients = len(patients)
-        num = num_of_patients // 10
-        if dataset_mode == 'train':
-            self.patients = patients[0:8*num]
-        elif dataset_mode == 'validate':
-            self.patients = patients[8*num: 10*num]
-        else:
-            raise ValueError("Dataset {} not supported".format(dataset_mode))
+        for idx in range(len(self.img_list)):
+            print("Loading {}".format(idx))
+            ith_info = self.img_list[idx].split(" ")
+            ct_img_name = ith_info[0]
+            cb_img_name = ith_info[1]
+            roi_lbl_name = ith_info[2]
+            ct_sblbl_name = ith_info[3]
+            ct_sdlbl_name = ith_info[4]
+            cb_sblbl_name = ith_info[5]
+            cb_sdlbl_name = ith_info[6]
+            assert os.path.isfile(ct_img_name)
+            assert os.path.isfile(cb_img_name)
+            assert os.path.isfile(roi_lbl_name)
+            assert os.path.isfile(ct_sblbl_name)
+            assert os.path.isfile(ct_sdlbl_name)
+            assert os.path.isfile(cb_sblbl_name)
+            assert os.path.isfile(cb_sdlbl_name)
 
-        self.all_cases = []
+            ct_img_itk = sitk.ReadImage(ct_img_name)
+            cb_img_itk = sitk.ReadImage(cb_img_name)
+            roi_lbl_itk = sitk.ReadImage(roi_lbl_name)
+            ct_sblbl_itk = sitk.ReadImage(ct_sblbl_name)
+            ct_sdlbl_itk = sitk.ReadImage(ct_sdlbl_name)
+            cb_sblbl_itk = sitk.ReadImage(cb_sblbl_name)
+            cb_sdlbl_itk = sitk.ReadImage(cb_sdlbl_name)
 
-        for patient_folder in self.patients:
-            cases_folder = glob.glob(os.path.join(patient_folder, "*cropped_images"))
-            for image_folder in cases_folder:
-                image_case = image_folder.split('-01_cropped_images')[0][-2:]
-                file_dict = [os.path.join(image_folder, '1900-01__Studies_image_cropped_{}.nii.gz'.format(image_case)),
-                             os.path.join(image_folder, '1900-01__Studies_SmBowel_label.nii.gz'),
-                             os.path.join(image_folder, '1900-01__Studies_StomachDuo_label.nii.gz'),
-                             os.path.join(image_folder, '1900-01__Studies_weighted_mask.nii.gz'),
-                             os.path.join(image_folder, '1900-01__Studies_weighted_mask_before_smooth.nii.gz'),
-                             os.path.join(image_folder, '19{}-01__Studies_image_normalized.nii.gz'.format(image_case)),
-                             os.path.join(image_folder, '19{}-01__Studies_SmBowel_label.nii.gz'.format(image_case)),
-                             os.path.join(image_folder, '19{}-01__Studies_StomachDuo_label.nii.gz'.format(image_case))]
-                self.all_cases.append(file_dict)
+            # data processing
+            ct_img_arr = sitk.GetArrayFromImage(ct_img_itk)
+            cb_img_arr = sitk.GetArrayFromImage(cb_img_itk)
+            roi_lbl_arr = sitk.GetArrayFromImage(roi_lbl_itk)
+            ct_sblbl_arr = sitk.GetArrayFromImage(ct_sblbl_itk)
+            ct_sdlbl_arr = sitk.GetArrayFromImage(ct_sdlbl_itk)
+            cb_sblbl_arr = sitk.GetArrayFromImage(cb_sblbl_itk)
+            cb_sdlbl_arr = sitk.GetArrayFromImage(cb_sdlbl_itk)
 
-        self.__multi_threads_loading()
-        image_io = py_fio.ImageIO()
-        _, target_hdrc, target_spacing, _ = image_io.read_to_nc_format(self.all_cases[0][0], silent_mode=True)
-        self.target_hdrc = target_hdrc
-        self.target_spacing = target_spacing
+            if self.mode == 'train':
+                ct_img_arr, cb_img_arr, roi_lbl_arr, \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
+                    self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
+                                                     ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
+            elif self.mode == 'test':
+                ct_img_arr, cb_img_arr, roi_lbl_arr, \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
+                    self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
+                                                    ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr )
+            else:
+                raise ValueError("Mode Wrong! Only train and test are supported!")
 
-        self.sz = [192, 192, 192]  # fixed patch size
-        return
+            ct_img_arr = self.__nii2tensorarray__(ct_img_arr)
+            cb_img_arr = self.__nii2tensorarray__(cb_img_arr)
+            roi_lbl_arr = self.__nii2tensorarray__(roi_lbl_arr)
+            ct_sblbl_arr = self.__nii2tensorarray__(ct_sblbl_arr)
+            ct_sdlbl_arr = self.__nii2tensorarray__(ct_sdlbl_arr)
+            cb_sblbl_arr = self.__nii2tensorarray__(cb_sblbl_arr)
+            cb_sdlbl_arr = self.__nii2tensorarray__(cb_sdlbl_arr)
 
-    def __multi_threads_loading(self):
-        manager = multiprocessing.Manager()
-        self.files_dict = manager.dict()
-        self.roi_dict = manager.dict()
-        split_list = self.__split_files()
-        process = []
-        for i in range(self.num_of_workers):
-            p = multiprocessing.Process(target=self.__load_images_and_compress, args=(split_list[i],))
-            p.start()
-            process.append(p)
+            self.img_dict[ct_img_name] = blosc.pack_array(ct_img_arr)
+            self.img_dict[cb_img_name] = blosc.pack_array(cb_img_arr)
+            self.img_dict[roi_lbl_name] = blosc.pack_array(roi_lbl_arr)
+            self.img_dict[ct_sblbl_name] = blosc.pack_array(ct_sblbl_arr)
+            self.img_dict[ct_sdlbl_name] = blosc.pack_array(ct_sdlbl_arr)
+            self.img_dict[cb_sblbl_name] = blosc.pack_array(cb_sblbl_arr)
+            self.img_dict[cb_sdlbl_name] = blosc.pack_array(cb_sdlbl_arr)
 
-        for p in process:
-            p.join()
-        self.files_dict = dict(self.files_dict)
-        self.roi_dict = dict(self.roi_dict)
-        print("Finish loading images")
-        return
-
-    def __split_files(self):
-        index_list = list(range(len(self.all_cases)))
-        index_split = np.array_split(np.array(index_list), self.num_of_workers)
-        split_list = []
-        for i in range(self.num_of_workers):
-            current_list = self.all_cases[index_split[i][0]:index_split[i][0] + len(index_split[i])]
-            split_list.append(current_list)
-        return split_list
-
-
-    def __get_mid_roi(self, image):
-        r = np.any(image, axis=(1, 2))
-        c = np.any(image, axis=(0, 2))
-        z = np.any(image, axis=(0, 1))
-
-        rmin, rmax = np.where(r)[0][[0, -1]]
-        cmin, cmax = np.where(c)[0][[0, -1]]
-        zmin, zmax = np.where(z)[0][[0, -1]]
-
-        mid_point = np.array([rmin + (rmax - rmin)//2, cmin + (cmax - cmin)//2, zmin + (zmax - zmin)//2])
-        return mid_point
-
-    def __load_images_and_compress(self, image_list):
-        pbar = pb.ProgressBar(widgets=[pb.Percentage(), pb.Bar(), pb.ETA()], maxval=len(image_list) * len(image_list[0])).start()
-        count = 0
-        image_io = py_fio.ImageIO()
-        for patient_cases in image_list:
-            for file_name in patient_cases:
-                if os.path.isfile(file_name):
-                    image, _, _, _ = image_io.read_to_nc_format(file_name, silent_mode=True)
-                    image_compressed = blosc.pack_array(image)
-                    if os.path.basename(file_name) == '1900-01__Studies_weighted_mask_before_smooth.nii.gz':
-                        mid_point = self.__get_mid_roi(image[0, 0, ...])
-                        self.roi_dict[file_name] = mid_point
-                    else:
-                        self.files_dict[file_name] = image_compressed
-
-                count += 1
-                pbar.update(count)
-        pbar.finish()
-        return
+    def __nii2tensorarray__(self, data):
+        [z, y, x] = data.shape
+        new_data = np.reshape(data, [1, z, y, x])
+        new_data = new_data.astype("float32")
+        return new_data
 
     def __len__(self):
-        return len(self.all_cases)
+        return len(self.img_list)
 
     def __getitem__(self, idx):
-        file_dict = self.all_cases[idx]
-        weighted_mask_before_smooth_name = file_dict[4]
-        roi = self.roi_dict[weighted_mask_before_smooth_name]
-        random_shift = np.random.randint(-10, 21, size=(3,))
-        new_center = roi + random_shift
-        output_dict = {}
-        for file_name in file_dict:
-            image_case = file_name.split('-01_cropped_images')[0][-2:]
-            if os.path.isfile(file_name):
-                if os.path.basename(file_name) == "1900-01__Studies_weighted_mask_before_smooth.nii.gz":
-                    continue
-                image_compressed = self.files_dict[file_name]
-                image_full = blosc.unpack_array(image_compressed)
-                image = image_full[0, [0],
-                        max(min(new_center[0]-96, 32), 0):max(min(new_center[0]+96, 224), 192),
-                        (new_center[1]-96):(new_center[1]+96),
-                        (new_center[2]-96):(new_center[2]+96)]
-                if os.path.basename(file_name) == "1900-01__Studies_image_cropped_{}.nii.gz".format(image_case):
-                    output_dict['CT_image'] = image
-                elif os.path.basename(file_name) == "1900-01__Studies_SmBowel_label.nii.gz":
-                    output_dict['CT_SmLabel'] = image
-                elif os.path.basename(file_name) == "1900-01__Studies_StomachDuo_label.nii.gz":
-                    output_dict['CT_SdLabel'] = image
-                elif os.path.basename(file_name) == "1900-01__Studies_weighted_mask.nii.gz":
-                    output_dict['weighted_mask'] = image
-                elif os.path.basename(file_name) == "19{}-01__Studies_image_normalized.nii.gz".format(image_case):
-                    output_dict['CBCT_image'] = image
-                elif os.path.basename(file_name) == "19{}-01__Studies_SmBowel_label.nii.gz".format(image_case):
-                    output_dict['CBCT_SmLabel'] = image
-                elif os.path.basename(file_name) == "19{}-01__Studies_StomachDuo_label.nii.gz".format(image_case):
-                    output_dict['CBCT_SdLabel'] = image
-                elif os.path.basename(file_name) == "1900-01__Studies_weighted_mask_before_smooth.nii.gz":
-                    output_dict['weighted_mask_bs'] = image
-                else:
-                    raise ValueError("Wrong file name, check")
-        return output_dict
+
+        if self.mode == "train":
+            # read image and labels
+            ith_info = self.img_list[idx].split(" ")
+            ct_img_name = ith_info[0]
+            cb_img_name = ith_info[1]
+            roi_lbl_name = ith_info[2]
+            ct_sblbl_name = ith_info[3]
+            ct_sdlbl_name = ith_info[4]
+            cb_sblbl_name = ith_info[5]
+            cb_sdlbl_name = ith_info[6]
 
 
-    def __setup_root_folder(self):
-        hostname = socket.gethostname()
-        root_folder = None
-        if hostname == 'biag-gpu0.cs.unc.edu':
-            root_folder = '/playpen1/xhs400/Research/data/r21'
-        elif hostname == 'biag-w05.cs.unc.edu':
-            root_folder = '/playpen1/xhs400/Research/data/r21'
-        return root_folder
+            ct_img_arr = blosc.unpack_array(self.img_dict[ct_img_name])
+            cb_img_arr = blosc.unpack_array(self.img_dict[cb_img_name])
+            roi_lbl_arr = blosc.unpack_array(self.img_dict[roi_lbl_name])
+            ct_sblbl_arr = blosc.unpack_array(self.img_dict[ct_sblbl_name])
+            ct_sdlbl_arr = blosc.unpack_array(self.img_dict[ct_sdlbl_name])
+            cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
+            cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
+
+            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
+
+        elif self.mode == "test":
+            # read image and labels
+            ith_info = self.img_list[idx].split(" ")
+            ct_img_name = ith_info[0]
+            cb_img_name = ith_info[1]
+            roi_lbl_name = ith_info[2]
+            ct_sblbl_name = ith_info[3]
+            ct_sdlbl_name = ith_info[4]
+            cb_sblbl_name = ith_info[5]
+            cb_sdlbl_name = ith_info[6]
+
+            ct_img_arr = blosc.unpack_array(self.img_dict[ct_img_name])
+            cb_img_arr = blosc.unpack_array(self.img_dict[cb_img_name])
+            roi_lbl_arr = blosc.unpack_array(self.img_dict[roi_lbl_name])
+            ct_sblbl_arr = blosc.unpack_array(self.img_dict[ct_sblbl_name])
+            ct_sdlbl_arr = blosc.unpack_array(self.img_dict[ct_sdlbl_name])
+            cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
+            cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
+
+            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
+
+
+    def __drop_invalid_range__(self, volume, label=None):
+        """
+        Cut off the invalid area
+        """
+        zero_value = volume[0, 0, 0]
+        non_zeros_idx = np.where(volume != zero_value)
+
+        [max_z, max_h, max_w] = np.max(np.array(non_zeros_idx), axis=1)
+        [min_z, min_h, min_w] = np.min(np.array(non_zeros_idx), axis=1)
+
+        if label is not None:
+            return volume[min_z:max_z, min_h:max_h, min_w:max_w], label[min_z:max_z, min_h:max_h, min_w:max_w]
+        else:
+            return volume[min_z:max_z, min_h:max_h, min_w:max_w]
+
+    def __random_center_crop__(self, data, label):
+        from random import random
+        """
+        Random crop
+        """
+        target_indexs = np.where(label > 0)
+        [img_d, img_h, img_w] = data.shape
+        [max_D, max_H, max_W] = np.max(np.array(target_indexs), axis=1)
+        [min_D, min_H, min_W] = np.min(np.array(target_indexs), axis=1)
+        [target_depth, target_height, target_width] = np.array([max_D, max_H, max_W]) - np.array([min_D, min_H, min_W])
+        Z_min = int((min_D - target_depth * 1.0 / 2) * random())
+        Y_min = int((min_H - target_height * 1.0 / 2) * random())
+        X_min = int((min_W - target_width * 1.0 / 2) * random())
+
+        Z_max = int(img_d - ((img_d - (max_D + target_depth * 1.0 / 2)) * random()))
+        Y_max = int(img_h - ((img_h - (max_H + target_height * 1.0 / 2)) * random()))
+        X_max = int(img_w - ((img_w - (max_W + target_width * 1.0 / 2)) * random()))
+
+        Z_min = np.max([0, Z_min])
+        Y_min = np.max([0, Y_min])
+        X_min = np.max([0, X_min])
+
+        Z_max = np.min([img_d, Z_max])
+        Y_max = np.min([img_h, Y_max])
+        X_max = np.min([img_w, X_max])
+
+        Z_min = int(Z_min)
+        Y_min = int(Y_min)
+        X_min = int(X_min)
+
+        Z_max = int(Z_max)
+        Y_max = int(Y_max)
+        X_max = int(X_max)
+
+        return data[Z_min: Z_max, Y_min: Y_max, X_min: X_max], label[Z_min: Z_max, Y_min: Y_max, X_min: X_max]
+
+    def __itensity_normalize_one_volume__(self, volume):
+        """
+        normalize the itensity of an nd volume based on the mean and std of nonzeor region
+        inputs:
+            volume: the input nd volume
+        outputs:
+            out: the normalized nd volume
+        """
+
+        bg = -1
+        pixels = volume[volume > bg]
+        mean = pixels.mean()
+        std = pixels.std()
+        out = (volume - mean) / std
+        # out_random = np.random.normal(0, 1, size = volume.shape)
+        # out[volume == bg] = out_random[volume == bg]
+        return out
+
+    def __resize_data__(self, data):
+        """
+        Resize the data to the input size
+        """
+        [depth, height, width] = data.shape
+        scale = [self.input_D * 1.0 / depth, self.input_H * 1.0 / height, self.input_W * 1.0 / width]
+        data = ndimage.interpolation.zoom(data, scale, order=0)
+
+        return data
+
+    def __crop_data__(self, data, label):
+        """
+        Random crop with different methods:
+        """
+        # random center crop
+        data, label = self.__random_center_crop__(data, label)
+
+        return data, label
+
+    def __processing_training_data__(self, ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr):
+        # drop out the invalid range
+        # data, label = self.__drop_invalid_range__(data, label)
+
+        # crop data
+        # data, label = self.__crop_data__(data, label)
+
+        # resize data
+        ct_img_arr = self.__resize_data__(ct_img_arr)
+        cb_img_arr = self.__resize_data__(cb_img_arr)
+        roi_lbl_arr = self.__resize_data__(roi_lbl_arr)
+        ct_sblbl_arr = self.__resize_data__(ct_sblbl_arr)
+        ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
+        cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
+        cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
+
+        # normalization datas
+        ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
+        cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
+
+        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
+
+
+    def __processing_testing_data__(self, ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr):
+        # resize data
+        ct_img_arr = self.__resize_data__(ct_img_arr)
+        cb_img_arr = self.__resize_data__(cb_img_arr)
+        roi_lbl_arr = self.__resize_data__(roi_lbl_arr)
+        ct_sblbl_arr = self.__resize_data__(ct_sblbl_arr)
+        ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
+        cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
+        cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
+
+        # normalization datas
+        ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
+        cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
+
+        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr

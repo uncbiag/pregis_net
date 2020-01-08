@@ -1,5 +1,4 @@
 from modules.unet import ReconsNet
-from modules.pregis_net import PregisNet
 from modules.vae import VaeNet
 
 import numpy as np
@@ -62,21 +61,7 @@ def test_unet():
     return
 
 
-def test_pregis_net():
-    m = torch.FloatTensor(1,1,256,256,128).uniform_().cuda()
-    t = torch.FloatTensor(1,1,256,256,128).uniform_().cuda()
 
-    m0 = torch.FloatTensor(1,3,256,256,128).fill_(1).cuda()
-    i0 = torch.FloatTensor(1,1,256,256,128).uniform_().cuda()
-
-    model = PregisNet(t.size())
-    model.cuda()
-
-    recons, phi, warped = model(m, t)
-
-    print(recons.size())
-    print(phi.size())
-    print(warped.size())
 
 if __name__ == '__main__':
     test_vae()

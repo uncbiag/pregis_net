@@ -44,7 +44,6 @@ def evaluate_momentum(moving_image, target_image, target_spacing, momentum, regi
     return warped_image, map_from_momentum
 
 
-
 def image_pair_registration(moving_images_w_masks, target_images_w_masks, target_image_spacing, map_resolution, result_folder, registration_param_file):
     """
     :param moving_image_paths: path for moving image
@@ -264,3 +263,52 @@ def evaluate_model(ISource_in,ITarget_in,sz,spacing,individual_parameters,shared
 
     return rec_IWarped, rec_phiWarped, rec_phiWarped_inverse
 
+def resample_image(I, spacing, desired_size, spline_order=1, zero_boundary=False, identity_map=None):
+    """
+    Resample an image to a given desired size
+    :param I: Input image (expected to be of BxCxXxYxZ format)
+    :param spacing: array describing the spatial spacing
+    :param desired_size: array for the desired size (excluding B and C, i.e, 1 entry for 1D, 2 for 2D, and 3 for 3D)
+    :return: returns a tuple: the downsampled image, the new spacing after downsampling
+    """
+    desiredSize = desired_size[2:]
+    sz = np.array(list(I.size()))
+    # check that the batch size and the number of channels is the same
+    nrOfI = sz[0]
+    nrOfC = sz[1]
+    desired_size_NC = np.array([nrOfI, nrOfC] + list(desiredSize))
+
+    new_spacing = spacing * ((sz[2::].astype('float') - 1.) / (
+                desired_size_NC[2::].astype('float') - 1.))  ###########################################
+    if identity_map is not None:
+        idDes = identity_map
+    else:
+        idDes = AdaptVal(torch.from_numpy(py_utils.identity_map_multiN(desired_size_NC, new_spacing)))
+    # now use this map for resampling
+    ID = py_utils.compute_warped_image_multiNC(I, idDes, new_spacing, spline_order, zero_boundary)
+
+    return ID, new_spacing
+
+
+def get_resampled_image(I, spacing, desired_size, spline_order=1, zero_boundary=False, identity_map=None):
+    """
+    :param I:  B C X Y Z
+    :param spacing: spx spy spz
+    :param desiredSize: B C X Y Z
+    :param spline_order:
+    :param zero_boundary:
+    :param identity_map:
+    :return:
+    """
+    if spacing is None:
+        img_sz = I.shape[2:]
+        spacing = 1. / (np.array(img_sz) - 1)
+    if identity_map is not None:  # todo  will remove, currently fix for symmetric training
+        if I.shape[0] != identity_map.shape[0]:
+            n_batch = I.shape[0]
+            desiredSize = desired_size.copy()
+            desiredSize[0] = n_batch
+            identity_map = identity_map[:n_batch]
+    resampled, new_spacing = resample_image(I, spacing, desired_size, spline_order=spline_order,
+                                            zero_boundary=zero_boundary, identity_map=identity_map)
+    return resampled

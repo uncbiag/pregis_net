@@ -274,6 +274,51 @@ class OptimalMassTransportSimilarity(SimilarityMeasure):
                                           nr_iterations_sinkhorn, std_sink)
         return result / (self.std_dev ** 2)
 
+class MaskNCCSimilarity(SimilarityMeasure):
+    """
+    last channel is for cost function masking (in target space)
+    """
+
+    def __init__(self, spacing, params):
+        super(MaskNCCSimilarity, self).__init__(spacing, params)
+
+    def compute_similarity_multiC(self, I0, I1, I0Source=None, phi=None):
+        sz0 = I0.size()[0]
+        sz1 = I1.size()[0]
+        assert (sz0 == sz1 - 1)
+        mask = I1[-1, ...]
+        # mask = torch.ones_like(I0[0, ...]).cuda()
+
+        sim = 0.
+        for nrC in range(sz0):
+            if nrC == 0:
+                sim = sim + self.compute_similarity(I0[nrC, ...], I1[nrC, ...], mask=mask, isLabel=False)
+            else:
+                sim = sim + self.compute_similarity(I0[nrC, ...], I1[nrC, ...], mask=mask, isLabel=True)
+
+        return sim
+
+    def compute_similarity(self, I0, I1, mask, isLabel=False):
+        indices = (mask > 0.5)  # mask may be float type
+        I0_v = I0[indices]
+        I1_v = I1[indices]
+
+        if isLabel:
+            sim = ((I0_v - I1_v) ** 2).sum()
+            sim = sim / ((I1_v **2).sum() + (I0_v**2).sum() + 1e-5)
+            sim = AdaptVal( sim / self.sigma ** 2)
+        else:
+            I0mean = I0_v.mean()
+            I1mean = I1_v.mean()
+            if I0mean == 0 and I1mean == 0:
+                nccSqr = torch.tensor(1)
+            elif I0mean == 0 or I1mean == 0:
+                nccSqr = torch.tensor(0)
+            else:
+                nccSqr = (((I0_v - I0mean.expand_as(I0_v)) * (I1_v - I1mean.expand_as(I1_v))).mean() ** 2) / \
+                         (((I0_v - I0mean) ** 2).mean() * ((I1_v - I1mean) ** 2).mean())
+            sim = AdaptVal((1 - nccSqr) / self.sigma ** 2)
+        return sim
 
 class NCCSimilarity(SimilarityMeasure):
     """
@@ -608,23 +653,12 @@ class CustLNCCSimilarity(SimilarityMeasure):
             for nrL in range(num_of_labels):
                 sim = sim + self.compute_similarity(I0_labels[nrL, ...], I1_labels[nrL, ...], isLabel=True,
                                                     similarity_mask=mask)
-
         return AdaptVal(sim / self.sigma ** 2)
 
     def compute_similarity(self, I0, I1, I0Source=None, phi=None, isLabel=False, similarity_mask=None):
-        """
-       Computes the NCC-based image similarity measure between two images
-
-       :param I0: first image
-       :param I1: second image
-       :param I0Source: not used
-       :param phi: not used
-
-       """
-
         if isLabel:
             sim = (torch.mul((I0 - I1) ** 2, similarity_mask)).sum()
-            sim = sim / (torch.mul(I0 ** 2 + I1 ** 2, similarity_mask)).sum()
+            sim = sim / ((torch.mul(I0 ** 2 + I1 ** 2, similarity_mask)).sum() + 1e-5)
         else:
             input = I0.view([1, 1] + list(I0.shape))
             target = I1.view([1, 1] + list(I1.shape))
@@ -914,7 +948,8 @@ class SimilarityMeasureFactory(object):
             'lncc': LNCCSimilarity,  # LocalizedNCCSimilarity,
             'omt': OptimalMassTransportSimilarity,
             'custncc': CustomizedSimilarity,
-            'custlncc': CustLNCCSimilarity
+            'custlncc': CustLNCCSimilarity,
+            'maskncc': MaskNCCSimilarity
         }
         """currently implemented similiarity measures"""
 

@@ -6,6 +6,7 @@ import torchvision.utils as vision_utils
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+import cv2
 
 plt.rcParams.update({'figure.max_open_warning': 0})
 
@@ -31,7 +32,7 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None, dim=3):
     ax.set_axis_off()
     ax.axis('equal')
     if background_image is not None:
-        ax.imshow(background_image.squeeze(), vmin=0, vmax=1, cmap='gray')
+        ax.imshow(background_image.squeeze(), cmap='gray')
     for i, axis in enumerate(left_axis):
         T_slice = transform[axis, :, :]
         ax.contour(T_slice, colors=['red'], linewidths=10.0, linestyles='solid', levels=np.linspace(-1, 1, 40))
@@ -44,8 +45,8 @@ def generate_deform_grid(transform, slice_axis=0, background_image=None, dim=3):
 
 
 def make_image_summary(images_to_show, labels_to_show, phis_to_show, n_samples=1):
-    n_samples = min(n_samples, images_to_show[0].size()[0])
-    dim = len(images_to_show[0].shape) - 2
+    n_samples = min(n_samples, images_to_show['ct_image'].size()[0])
+    dim = len(images_to_show['ct_image'].shape) - 2
 
     image_slices_to_show = []
     label_slices_to_show = []
@@ -53,19 +54,43 @@ def make_image_summary(images_to_show, labels_to_show, phis_to_show, n_samples=1
     grids = {}
     for n in range(n_samples):
         if dim == 3:
-            for axis in range(1, 2):
-                slice_idx = images_to_show[0].size()[axis + 1] // 2
+            for axis in range(1, 4):
+                slice_idx = images_to_show['ct_image'].size()[axis + 1] // 2
                 image_slices = []
                 grid_slices = []
                 label_slices = []
-                for label in labels_to_show:
-                    label_slice = torch.flip(torch.select(label[n, :, :, :, :], axis, slice_idx), dims=[1])
-                    label_slices.append(label_slice)
-                for image in images_to_show:
-                    image_slice = torch.flip(torch.select(image[n, :, :, :, :], axis, slice_idx), dims=[1])
+
+                image_dict = {}
+                contour_dict = {}
+                for image_name, image in images_to_show.items():
+                    image_slice = torch.select(image[n, :, :, :, :], axis, slice_idx)
+                    image_dict[image_name] = torch.squeeze(image_slice)
                     image_slices.append(image_slice)
+
+                for label_name, label in labels_to_show.items():
+                    label_slice = torch.squeeze(torch.select(label[n, :, :, :, :], axis, slice_idx))
+                    _, contours, _ = cv2.findContours(label_slice.numpy().astype(np.uint8), mode=cv2.RETR_EXTERNAL,
+                                                      method=cv2.CHAIN_APPROX_SIMPLE)
+                    contour_dict[label_name] = contours
+
+                for label_name, contours in contour_dict.items():
+                    if label_name == 'roi_label':
+                        continue
+                    img = label_name.split('_')[0]
+                    # label_slice = torch.squeeze(image_dict[img + '_image']).numpy().copy()
+                    roi_contour = contour_dict['roi_label'] + contours
+                    label_slice = cv2.drawContours(
+                        cv2.cvtColor(
+                            cv2.normalize(
+                                torch.squeeze(image_dict[img + '_image']).numpy(),
+                                None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1),
+                            cv2.COLOR_GRAY2RGB)
+                        , roi_contour, -1, (255, 255, 255), 1)
+                    label_slices.append(torch.from_numpy(
+                        cv2.cvtColor(label_slice, cv2.COLOR_RGB2GRAY)[np.newaxis, :].astype(np.float32)
+                    ))
                 for phi in phis_to_show:
-                    phi_slice = torch.flip(torch.select(phi[n, :, :, :, :], axis, slice_idx), dims=[1])
+                    phi_slice = torch.select(phi[n, :, :, :, :], axis, slice_idx)
                     grid_slice = torch.from_numpy(
                         generate_deform_grid(phi_slice, axis - 1, image_slices[2], dim=3)
                     )
@@ -75,10 +100,10 @@ def make_image_summary(images_to_show, labels_to_show, phis_to_show, n_samples=1
                 grid_slices_to_show += grid_slices
         else:
             raise ValueError("dimension not supported")
-        grids['labels'] = vision_utils.make_grid(label_slices_to_show, pad_value=1, nrow=len(labels_to_show),
-                                                 normalize=True, range=(0, 1))
-        grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(images_to_show),
-                                                 normalize=True, range=(0, 1))
+        grids['labels'] = vision_utils.make_grid(label_slices_to_show, pad_value=1, nrow=len(label_slices),
+                                                 normalize=True, range=None)
+        grids['images'] = vision_utils.make_grid(image_slices_to_show, pad_value=1, nrow=len(image_slices),
+                                                 normalize=True, range=None)
         if len(grid_slices_to_show) > 0:
             grids['grid'] = vision_utils.make_grid(grid_slices_to_show, pad_value=1, nrow=dim)
     return grids

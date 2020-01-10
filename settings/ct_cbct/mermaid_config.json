@@ -117,8 +117,8 @@
                         ]
                     ]
                 },
-                "sigma": 2.236,
-                "type": "custlncc"
+                "sigma": 0.1,
+                "type": "maskncc"
             },
             "spline_order": 1,
             "type": "svf_vector_momentum_map",

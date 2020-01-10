@@ -6,7 +6,7 @@ from sklearn.model_selection import KFold
 from operator import itemgetter
 
 
-def generate_img_list(patients, indices, fold):
+def generate_img_list(patients, indices):
     patients = itemgetter(*indices)(patients)
     img_line = ""
     for patient in patients:
@@ -34,10 +34,10 @@ if __name__ == '__main__':
     patients = sorted(glob.glob(os.path.join(root_folder, '18227*')))
     print(patients)
 
-    kf = KFold(n_splits=4, shuffle=True)
+    kf = KFold(n_splits=5, shuffle=True)
     fold = 1
     for train_index, test_index in kf.split(patients):
-        train_line = generate_img_list(patients, train_index, fold)
+        train_line = generate_img_list(patients, train_index)
         train_file = "train_{}.txt".format(fold)
         train_f = open(train_file, 'w')
         train_f.write(train_line)

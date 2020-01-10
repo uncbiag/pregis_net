@@ -1,7 +1,8 @@
 # from builtins import range
 import torch
 
-def scale_map(map,spacing):
+
+def scale_map(map, spacing):
     """
     Scales the map to the [-1,1]^d format
 
@@ -18,14 +19,15 @@ def scale_map(map,spacing):
     # id[d]-=1.
 
     for d in range(ndim):
-        if sz[d+2] >1:
+        if sz[d + 2] > 1:
             map_scaled[:, d, ...] = map[:, d, ...] * (2. / (sz[d + 2] - 1.) / spacing[d]) - 1.
         else:
-            map_scaled[:, d, ...] = map[:,d,...]
+            map_scaled[:, d, ...] = map[:, d, ...]
 
     return map_scaled
 
-def scale_map_grad(grad_map,spacing):
+
+def scale_map_grad(grad_map, spacing):
     """
     Scales the gradient back
     :param grad_map: gradient (computed based on map normalized to [-1,1]
@@ -37,10 +39,9 @@ def scale_map_grad(grad_map,spacing):
     sz = grad_map.size()
     ndim = len(spacing)
     for d in range(ndim):
-        #grad_map[:, d, ...] *= spacing[d] * (sz[d + 2] - 1) / 2.
-        #grad_map[:, d, ...] *= (sz[d + 2] - 1)/2.
+        # grad_map[:, d, ...] *= spacing[d] * (sz[d + 2] - 1) / 2.
+        # grad_map[:, d, ...] *= (sz[d + 2] - 1)/2.
         if sz[d + 2] > 1:
-            grad_map[:, d, ...]  *= (2. / (sz[d + 2] - 1.) / spacing[d])
+            grad_map[:, d, ...] *= (2. / (sz[d + 2] - 1.) / spacing[d])
         else:
             grad_map[:, d, ...] = grad_map[:, d, ...]
-

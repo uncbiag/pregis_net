@@ -5,13 +5,13 @@ def parse_opts():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--train_list',
-        default='./data/sample_train.txt',
+        default='./data/ct_cbct/train_1.txt',
         type=str,
         help='Path for training image list file'
     )
     parser.add_argument(
         '--test_list',
-        default='./data/sample_test.txt',
+        default='./data/ct_cbct/test_1.txt',
         type=str,
         help='Path for testing image list file'
     )
@@ -36,6 +36,8 @@ def parse_opts():
         type=str,
         help='Path for resume model'
     )
+    parser.add_argument(
+        '--manual_seed', default=1, type=int, help='Manually set random seed')
     args = parser.parse_args()
 
     return args

@@ -98,6 +98,7 @@ class AdamW(optim.Optimizer):
 
         return loss
 
+
 class CosineAnnealingWarmRestarts(torch.optim.lr_scheduler._LRScheduler):
     r"""Set the learning rate of each parameter group using a cosine annealing
     schedule, where :math:`\eta_{max}` is set to the initial lr, :math:`T_{cur}`
@@ -166,6 +167,7 @@ class CosineAnnealingWarmRestarts(torch.optim.lr_scheduler._LRScheduler):
         for param_group, lr in zip(self.optimizer.param_groups, self.get_lr()):
             param_group['lr'] = lr
 
+
 class CosineAnnealingLR(torch.optim.lr_scheduler._LRScheduler):
     r"""Set the learning rate of each parameter group using a cosine annealing
     schedule, where :math:`\eta_{max}` is set to the initial lr and
@@ -213,18 +215,29 @@ def create_model(network_config):
     model = MermaidNet(network_config)
     model.cuda()
     model.apply(weights_init)
+    # for m in model.modules():
+    #     if isinstance(m, nn.Conv3d):
+    #         m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
+    #     elif isinstance(m, nn.BatchNorm3d):
+    #         m.weight.data.fill_(1)
+    #         m.bias.data.zero_()
     return model
+
 
 def create_dataloader(network_config, settings):
     model_config = network_config['model']
     train_dataset = R21RegDataset(settings, 'train')
     test_dataset = R21RegDataset(settings, 'test')
 
-    train_dataloader = DataLoader(train_dataset, batch_size=network_config['train']['batch_size'], shuffle=True, drop_last=True, num_workers=4)
-    test_dataloader = DataLoader(test_dataset, batch_size=network_config['train']['batch_size'], shuffle=False, drop_last=False, num_workers=4)
-    model_config['img_sz'] = [network_config['train']['batch_size'], 1, settings.input_D, settings.input_H, settings.input_W]
+    train_dataloader = DataLoader(train_dataset, batch_size=network_config['train']['batch_size'], shuffle=True,
+                                  drop_last=True, num_workers=4)
+    test_dataloader = DataLoader(test_dataset, batch_size=network_config['train']['batch_size'], shuffle=False,
+                                 drop_last=False, num_workers=4)
+    model_config['img_sz'] = [network_config['train']['batch_size'], 1, settings.input_D, settings.input_H,
+                              settings.input_W]
     model_config['dim'] = 3
     return train_dataloader, test_dataloader
+
 
 def create_optimizer(config, model):
     method = config['optimizer']['name']
@@ -252,7 +265,6 @@ def create_optimizer(config, model):
     else:
         raise ValueError("scheduler not supported")
     return optimizer, scheduler
-
 
 
 if __name__ == '__main__':

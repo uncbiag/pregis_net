@@ -215,12 +215,6 @@ def create_model(network_config):
     model = MermaidNet(network_config)
     model.cuda()
     model.apply(weights_init)
-    # for m in model.modules():
-    #     if isinstance(m, nn.Conv3d):
-    #         m.weight = nn.init.kaiming_normal_(m.weight, mode='fan_out')
-    #     elif isinstance(m, nn.BatchNorm3d):
-    #         m.weight.data.fill_(1)
-    #         m.bias.data.zero_()
     return model
 
 

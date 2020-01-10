@@ -38,6 +38,16 @@ def parse_opts():
     )
     parser.add_argument(
         '--manual_seed', default=1, type=int, help='Manually set random seed')
+    parser.add_argument(
+        '--network_name', default='model_20200110-004502',
+        type=str,
+        help="Trained model name, not saved torch file (see saved_model)"
+    )
+    parser.add_argument(
+        '--saved_model', default='best_eval.pth.tar',
+        type=str,
+        help="Saved torch file, not trained model (see network_name)"
+    )
     args = parser.parse_args()
 
     return args

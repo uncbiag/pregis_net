@@ -4,7 +4,7 @@ import glob
 import numpy as np
 from sklearn.model_selection import KFold
 from operator import itemgetter
-
+import socket
 
 def generate_img_list(patients, indices):
     patients = itemgetter(*indices)(patients)
@@ -30,7 +30,18 @@ def generate_img_list(patients, indices):
 
 
 if __name__ == '__main__':
-    root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images/all"
+    root_folder = None
+    hostname = socket.gethostname()
+    
+    if hostname == 'biag-w05.cs.unc.edu':
+        root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images/all"
+    elif hostname == 'biag-gpu1.cs.unc.edu':
+        root_folder = "/playpen/xhs400/data/r21/all"
+    else:
+        raise ValueError("Wrong host")
+    assert root_folder is not None
+
+
     patients = sorted(glob.glob(os.path.join(root_folder, '18227*')))
     print(patients)
 

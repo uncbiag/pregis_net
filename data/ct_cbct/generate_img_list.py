@@ -32,11 +32,13 @@ def generate_img_list(patients, indices):
 if __name__ == '__main__':
     root_folder = None
     hostname = socket.gethostname()
-    
+
+    np.random.seed(1)
+
     if hostname == 'biag-w05.cs.unc.edu':
         root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images/all"
     elif hostname == 'biag-gpu1.cs.unc.edu':
-        root_folder = "/playpen/xhs400/data/r21/all"
+        root_folder = "/playpen-raid1/xhs400/data/r21/all"
     else:
         raise ValueError("Wrong host")
     assert root_folder is not None
@@ -54,7 +56,7 @@ if __name__ == '__main__':
         train_f.write(train_line)
         train_f.close()
 
-        test_line = generate_img_list(patients, test_index, fold)
+        test_line = generate_img_list(patients, test_index)
         test_file = "test_{}.txt".format(fold)
         test_f = open(test_file, 'w')
         test_f.write(test_line)

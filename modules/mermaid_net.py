@@ -28,7 +28,6 @@ class MermaidNet(nn.Module):
         self.img_sz = model_config['img_sz']
         self.batch_size = self.img_sz[0]
 
-        self.step = 1
         self.mermaid_config_file = model_config['mermaid_config_file']
         self.mermaid_unit = None
         self.spacing = 1. / (np.array(self.img_sz[2:]) - 1)
@@ -134,37 +133,21 @@ class MermaidNet(nn.Module):
         return mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss
 
     def forward(self, ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel):
-
         # cb_image: [-1, 1], cb_image_n: [0, 1]
         # ct: same
         cb_image_n = (cb_image + 1) / 2.
         ct_image_n = (ct_image + 1) / 2.
-
         ct_labels = torch.cat((ct_sblabel, ct_sdlabel), dim=1)
         cb_labels = torch.cat((cb_sblabel, cb_sdlabel), dim=1)
 
-        # moving: CBCT, target: CT
-        cb_image_n_and_label = cb_image_n
-        cb_image_n_and_label = torch.cat((cb_image_n_and_label, cb_sblabel), dim=1)
-        cb_image_n_and_label = torch.cat((cb_image_n_and_label, cb_sdlabel), dim=1)
+        # moving: CT, target: CBCT
+        cb_image_n_and_label = torch.cat((cb_image_n, cb_sblabel, cb_sdlabel), dim=1)
+        ct_image_n_and_label = torch.cat((ct_image_n, ct_sblabel, ct_sdlabel), dim=1)
+        # add ROI to target space
+        cb_image_n_and_label = torch.cat((cb_image_n_and_label, roi_label), dim=1)
 
-        ct_image_and_label = ct_image
-        ct_image_and_label = torch.cat((ct_image_and_label, ct_sblabel), dim=1)
-        ct_image_and_label = torch.cat((ct_image_and_label, ct_sdlabel), dim=1)
-        ct_image_and_label = torch.cat((ct_image_and_label, roi_label), dim=1)
 
-        ct_image_n_and_label = ct_image_n
-        ct_image_n_and_label = torch.cat((ct_image_n_and_label, ct_sblabel), dim=1)
-        ct_image_n_and_label = torch.cat((ct_image_n_and_label, ct_sdlabel), dim=1)
-        ct_image_n_and_label = torch.cat((ct_image_n_and_label, roi_label), dim=1)
-
-        # First step of multi-step network:
-        # moving image is the warped image
-        # identity map is the init phi
-
-        warped_image = cb_image
         init_map = self.identityMap
-
         self.loss_dict = {
             'all_loss':  0.,
             'mermaid_all_loss': 0.,
@@ -173,35 +156,25 @@ class MermaidNet(nn.Module):
             'dice_SmLabel': 0.,
             'dice_SdLabel': 0.,
         }
-        out_roi = (F.interpolate(roi_label, scale_factor=0.5, mode='nearest') < 0.5)
-        for i in range(self.step):
-            # momentum is obtained from network (warped image to target image)
-            if self.use_ct_labels_as_input:
-                momentum = self.__network_forward__(moving_image=warped_image, target_image_and_label=ct_image_and_label)
-            else:
-                momentum = self.__network_forward__(moving_image=warped_image, target_image_and_label=ct_image)
-            momentum.masked_fill_(out_roi, 0)
-            # warped image is obtained by resampling the moving image
-            warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=cb_image_n, moving_labels=cb_labels,
-                                                                        momentum=momentum, init_map=init_map)
-            init_map = phi
-            self.phi = phi
+        momentum = self.__network_forward__(ct_image, cb_image, ct_labels, roi_label)
+        
+        warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels, momentum=momentum, init_map=init_map)
+        init_map = phi
+        self.phi = phi
 
-            # warped_image_n : [0, 1], warped_image: [-1, 1]
-            warped_image = warped_image_n * 2 - 1
-            self.warped_image = warped_image
-            self.warped_labels = warped_labels
-            all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=cb_image_n_and_label,
-                                                                     target_image_and_label=ct_image_n_and_label)
-            self.loss_dict['mermaid_all_loss'] += all_loss / self.batch_size
-            self.loss_dict['mermaid_sim_loss'] += sim_loss / self.batch_size
-            self.loss_dict['mermaid_reg_loss'] += reg_loss / self.batch_size
+        # warped_image_n : [0, 1], warped_image: [-1, 1]
+        warped_image = warped_image_n * 2 - 1
+        self.warped_image = warped_image
+        self.warped_labels = warped_labels
+        all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=ct_image_n_and_label,
+                                                                 target_image_and_label=cb_image_n_and_label)
+        self.loss_dict['mermaid_all_loss'] = all_loss / self.batch_size
+        self.loss_dict['mermaid_sim_loss'] = sim_loss / self.batch_size
+        self.loss_dict['mermaid_reg_loss'] = reg_loss / self.batch_size
 
         self.loss_dict['all_loss'] = self.loss_dict['mermaid_all_loss']
 
-        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(ct_labels,
-                                                                          self.warped_labels.detach(),
-                                                                          roi_label)
+        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_labels.detach(), cb_labels, roi_label)
         self.loss_dict['dice_SmLabel'] = sm_label_dice / self.batch_size
         self.loss_dict['dice_SdLabel'] = sd_label_dice / self.batch_size
 
@@ -224,10 +197,10 @@ class MermaidNet(nn.Module):
                                                               zero_boundary=True)
         return warped_image, warped_labels, phi
 
-    def __network_forward__(self, moving_image, target_image_and_label):
-        x1 = self.ec_1(moving_image)
-        x2 = self.ec_2(target_image_and_label)
-        x_l1 = torch.cat((x1, x2), dim=1)
+    def __network_forward__(self, ct_image, cb_image, ct_labels, roi_label):
+        x = torch.cat((ct_image, cb_image, ct_labels, roi_label), dim = 1)
+        x = self.ec_1(x)
+        x_l1 = self.ec_2(x)
         x = self.ec_3(x_l1)
         x = self.ec_4(x)
         x_l2 = self.ec_5(x)
@@ -257,14 +230,10 @@ class MermaidNet(nn.Module):
         return output
 
     def __setup_network_structure__(self):
-        self.ec_1 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.ec_1 = ConBnRelDp(5, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
-        if self.use_ct_labels_as_input:
-            self.ec_2 = ConBnRelDp(4, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                   use_bn=self.use_bn, use_dp=self.use_dp)
-        else:
-            self.ec_2 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                   use_bn=self.use_bn, use_dp=self.use_dp)
+        self.ec_2 = ConBnRelDp(8, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+                               use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_3 = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_4 = ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
@@ -305,71 +274,3 @@ class MermaidNet(nn.Module):
         self.dc_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.dc_23 = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
 
-    def __network_forward_old__(self, moving_image, target_image_and_label):
-        d1_1 = self.down_path_1_1(moving_image)
-        d1_2 = self.down_path_1_2(target_image_and_label)
-        d1 = torch.cat((d1_1, d1_2), 1)
-        d2_1 = self.down_path_2_1(d1)
-        d2_2 = self.down_path_2_2(d2_1)
-        d2_2 = d2_1 + d2_2
-        d2_3 = self.down_path_2_3(d2_2)
-        d2_3 = d2_1 + d2_3
-        d4_1 = self.down_path_4_1(d2_3)
-        d4_2 = self.down_path_4_2(d4_1)
-        d4_2 = d4_1 + d4_2
-        d4_3 = self.down_path_4_3(d4_2)
-        d4_3 = d4_2 + d4_3
-        d8_1 = self.down_path_8_1(d4_3)
-        d8_2 = self.down_path_8_2(d8_1)
-        d8_2 = d8_1 + d8_2
-        d8_3 = self.down_path_8_3(d8_2)
-        d8_3 = d8_2 + d8_3
-        d16_1 = self.down_path_16_1(d8_3)
-        d16_2 = self.down_path_16_2(d16_1)
-        d16_2 = d16_1 + d16_2
-
-        u8_1 = self.up_path_8_1(d16_2)
-        u8_2 = self.up_path_8_2(torch.cat((d8_3, u8_1), 1))
-        u8_3 = self.up_path_8_3(u8_2)
-        u8_3 = u8_2 + u8_3
-        u4_1 = self.up_path_4_1(u8_3)
-        u4_2 = self.up_path_4_2(torch.cat((d4_3, u4_1), 1))
-        u4_3 = self.up_path_4_3(u4_2)
-        u4_3 = u4_2 + u4_3
-        u2_1 = self.up_path_2_1(u4_3)
-        u2_2 = self.up_path_2_2(torch.cat((d2_3, u2_1), 1))
-        output = self.up_path_2_3(u2_2)
-
-        return output
-
-    def __setup_network_structure_old__(self):
-        self.down_path_1_1 = ConBnRelDp(1, 8, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
-        if self.use_ct_labels_as_input:
-            self.down_path_1_2 = ConBnRelDp(4, 8, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
-        else:
-            self.down_path_1_2 = ConBnRelDp(1, 8, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
-        self.down_path_2_1 = ConBnRelDp(16, 32, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=False)
-        self.down_path_2_2 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=False)
-        self.down_path_2_3 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_4_1 = ConBnRelDp(32, 64, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_4_2 = ConBnRelDp(64, 64, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_4_3 = ConBnRelDp(64, 64, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_8_1 = ConBnRelDp(64, 128, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_8_2 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_8_3 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_16_1 = ConBnRelDp(128, 256, 3, stride=2, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-        self.down_path_16_2 = ConBnRelDp(256, 256, 3, stride=1, activate_unit='relu', same_padding=True, use_bn=self.use_bn)
-
-        # output_size = strides * (input_size-1) + kernel_size - 2*padding
-        self.up_path_8_1 = ConBnRelDp(256, 128, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
-                                       reverse=True)
-        self.up_path_8_2 = ConBnRelDp(128 + 128, 128, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
-        self.up_path_8_3 = ConBnRelDp(128, 128, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
-        self.up_path_4_1 = ConBnRelDp(128, 64, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
-                                       reverse=True)
-        self.up_path_4_2 = ConBnRelDp(64 + 64, 32, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
-        self.up_path_4_3 = ConBnRelDp(32, 32, 3, stride=1, activate_unit='leaky_relu', same_padding=True, use_bn=self.use_bn)
-        self.up_path_2_1 = ConBnRelDp(32, 32, 2, stride=2, activate_unit='leaky_relu', same_padding=False, use_bn=self.use_bn,
-                                       reverse=True)
-        self.up_path_2_2 = ConBnRelDp(32 + 32, 16, 3, stride=1, activate_unit='None', same_padding=True)
-        self.up_path_2_3 = ConBnRelDp(16, 3, 3, stride=1, activate_unit='None', same_padding=True)

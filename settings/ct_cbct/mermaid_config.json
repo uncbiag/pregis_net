@@ -9,7 +9,7 @@
             "forward_model": {
                 "adjoin_on": true,
                 "atol": 1e-05,
-                "number_of_time_steps": 10,
+                "number_of_time_steps": 20,
                 "rtol": 1e-05,
                 "smoother": {
                     "multi_gaussian_stds": [
@@ -117,8 +117,8 @@
                         ]
                     ]
                 },
-                "sigma": 0.1,
-                "type": "maskncc"
+                "sigma": 0.5,
+                "type": "custlncc"
             },
             "spline_order": 1,
             "type": "svf_vector_momentum_map",

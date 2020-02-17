@@ -9,6 +9,7 @@ from scipy import ndimage
 import blosc
 import multiprocessing
 import progressbar as pb
+import torch
 
 blosc.set_nthreads(1)
 
@@ -84,6 +85,14 @@ class R21RegDataset(Dataset):
             print("Reading {}".format(settings.train_list))
             with open(settings.train_list, 'r') as f:
                 self.img_list = [line.strip() for line in f]
+                # fold_num = int(len(img_list)/8)
+                # self.img_list = img_list[0: 6*fold_num]
+        elif self.mode == 'validate':
+            print("Reading {}".format(settings.test_list))
+            with open(settings.test_list, 'r') as f:
+                self.img_list = [line.strip() for line in f]
+                # fold_num = int(len(img_list)/8)
+                # self.img_list = img_list[6*fold_num:]
         elif self.mode == 'test':
             print("Reading {}".format(settings.test_list))
             with open(settings.test_list, 'r') as f:
@@ -120,7 +129,7 @@ class R21RegDataset(Dataset):
             ith_info = image_list[idx].split(" ")
             ct_img_name = ith_info[0]
             cb_img_name = ith_info[1]
-            print("Loading {} {}".format(ct_img_name.split('all')[1], cb_img_name.split('all')[1]))
+            
             roi_lbl_name = ith_info[2]
             ct_sblbl_name = ith_info[3]
             ct_sdlbl_name = ith_info[4]
@@ -156,7 +165,7 @@ class R21RegDataset(Dataset):
                 ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_training_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
                                                       ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
-            elif self.mode == 'test':
+            elif self.mode == 'test' or self.mode == 'validate':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
                 ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
@@ -189,7 +198,7 @@ class R21RegDataset(Dataset):
             ith_info = self.img_list[idx].split(" ")
             ct_img_name = ith_info[0]
             cb_img_name = ith_info[1]
-            print("Loading {} {}".format(ct_img_name.split('all')[1], cb_img_name.split('all')[1]))
+            
             roi_lbl_name = ith_info[2]
             ct_sblbl_name = ith_info[3]
             ct_sdlbl_name = ith_info[4]
@@ -225,7 +234,7 @@ class R21RegDataset(Dataset):
                 ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_training_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
                                                       ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
-            elif self.mode == 'test':
+            elif self.mode == 'test' or self.mode == 'validate':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
                 ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
@@ -270,7 +279,7 @@ class R21RegDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        if self.mode == "train":
+        if self.mode == "train" or self.mode == 'validate':
             # read image and labels
             ith_info = self.img_list[idx].split(" ")
             ct_img_name = ith_info[0]
@@ -288,6 +297,9 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = blosc.unpack_array(self.img_dict[ct_sdlbl_name])
             cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
+
+            ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
+            cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
 
             return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 
@@ -327,13 +339,13 @@ class R21RegDataset(Dataset):
         else:
             return volume[min_z:max_z, min_h:max_h, min_w:max_w]
 
-    def __resize_data__(self, data):
+    def __resize_data__(self, data, order=0):
         """
         Resize the data to the input size
         """
         [depth, height, width] = data.shape
         scale = [self.input_D * 1.0 / depth, self.input_H * 1.0 / height, self.input_W * 1.0 / width]
-        data = ndimage.interpolation.zoom(data, scale, order=0)
+        data = ndimage.interpolation.zoom(data, scale, order=order)
 
         return data
 
@@ -355,8 +367,10 @@ class R21RegDataset(Dataset):
         # data, label = self.__crop_data__(data, label)
 
         # resize data
-        ct_img_arr = self.__resize_data__(ct_img_arr)
-        cb_img_arr = self.__resize_data__(cb_img_arr)
+        ct_img_arr = self.__resize_data__(ct_img_arr, order=3)
+        cb_img_arr = self.__resize_data__(cb_img_arr, order=3)
+
+
         roi_lbl_arr = self.__resize_data__(roi_lbl_arr)
         ct_sblbl_arr = self.__resize_data__(ct_sblbl_arr)
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
@@ -372,8 +386,8 @@ class R21RegDataset(Dataset):
     def __processing_testing_data__(self, ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr,
                                     cb_sdlbl_arr):
         # resize data
-        ct_img_arr = self.__resize_data__(ct_img_arr)
-        cb_img_arr = self.__resize_data__(cb_img_arr)
+        ct_img_arr = self.__resize_data__(ct_img_arr, order=3)
+        cb_img_arr = self.__resize_data__(cb_img_arr, order=3)
         roi_lbl_arr = self.__resize_data__(roi_lbl_arr)
         ct_sblbl_arr = self.__resize_data__(ct_sblbl_arr)
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)

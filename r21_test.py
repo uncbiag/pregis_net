@@ -16,6 +16,7 @@ from torch.utils.data import DataLoader
 from data_loaders.ct_cbct import R21RegDataset
 import numpy as np
 
+
 class TestR21:
     def __init__(self):
         self.dataset = 'ct_cbct'
@@ -57,6 +58,7 @@ class TestR21:
         model = MermaidNet(self.network_config['model'])
         model.cuda()
         checkpoint = torch.load(self.network_file)
+        print("Best eval epoch: {}".format(checkpoint['epoch']))
         model.load_state_dict(checkpoint['model_state_dict'])
         model.eval()
         return model
@@ -65,10 +67,11 @@ class TestR21:
         model_config = self.network_config['model']
         test_dataset = R21RegDataset(self.settings, 'test')
 
-        test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False,
+        batch_size = 1
+        test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
                                      drop_last=False, num_workers=4)
         # add info to config
-        model_config['img_sz'] = [1, 1, self.settings.input_D, self.settings.input_H, self.settings.input_W]
+        model_config['img_sz'] = [batch_size, 1, self.settings.input_D, self.settings.input_H, self.settings.input_W]
         model_config['dim'] = 3
         return test_dataloader
 
@@ -97,16 +100,20 @@ class TestR21:
             self.mermaid_config = json.load(f)
         self.network_config['model']['mermaid_config_file'] = self.mermaid_config_file
 
-        print("Reading {}".format(self.settings.test_list))
+        #print("Reading {}".format(self.settings.test_list))
         with open(self.settings.test_list, 'r') as f:
             self.img_list = [line.strip() for line in f]
         return
 
-    def __calculate_dice_socre__(self, predicted_label, target_label, mask):
-        roi_indices = np.where(mask > 0.5)
-        predicted_in_mask = predicted_label[roi_indices]
-        target_in_mask = target_label[roi_indices]
-        intersection = (predicted_in_mask * target_in_mask) .sum()
+    def __calculate_dice_score__(self, predicted_label, target_label, mask=None):
+        if mask is not None:
+            roi_indices = np.where(mask > 0.5)
+            predicted_in_mask = predicted_label[roi_indices]
+            target_in_mask = target_label[roi_indices]
+        else:
+            predicted_in_mask = predicted_label
+            target_in_mask = target_label
+        intersection = (predicted_in_mask * target_in_mask).sum()
         smooth = 1.
         dice = (2 * intersection + smooth) / (predicted_in_mask.sum() + target_in_mask.sum() + smooth)
         return dice
@@ -115,20 +122,21 @@ class TestR21:
         iters = len(self.test_data_loader.dataset)
         print('iters:', str(iters))
 
-        loss_dict = {
-            'all_loss': 0.0,
-            'mermaid_all_loss': 0.0,
-            'mermaid_reg_loss': 0.0,
-            'mermaid_sim_loss': 0.0,
-            'dice_SmLabel': 0.,
-            'dice_SdLabel': 0.,
-        }
         mergeFilter = sitk.MergeLabelMapFilter()
         mergeFilter.SetMethod(Method=0)
         dice_file = os.path.join(self.test_folder, 'dice.txt')
+        dice_all_file = os.path.join(self.test_folder, 'dice_all.txt')
         f = open(dice_file, 'w')
+        # f2 = open(dice_all_file, 'w')
         with torch.no_grad():
             for j, images in enumerate(self.test_data_loader, 0):
+                ct_image_name = self.img_list[j].split(' ')[0]
+                cb_image_name = self.img_list[j].split(' ')[1]
+
+                if not ("OG" in ct_image_name and "OG" in cb_image_name):
+                    continue
+                patient = ct_image_name.split('18227')[1][0:2]
+                cb_case = cb_image_name.split('CBCT')[1][0:2]
                 ct_image = images[0].cuda()
                 cb_image = images[1].cuda()
                 roi_label = images[2].cuda()
@@ -137,27 +145,24 @@ class TestR21:
                 cb_sblabel = images[5].cuda()
                 cb_sdlabel = images[6].cuda()
                 self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
-
                 warped_image = self.model.warped_image
                 warped_sblabel = self.model.warped_labels[:, [0], ...]
                 warped_sdlabel = self.model.warped_labels[:, [1], ...]
 
-                phi = self.model.phi - self.model.identityMap
-                for dim in range(3):
-                    phi[0, dim, ...] = phi[0, dim, ...] / self.model.spacing[dim]
+                # phi = self.model.phi - self.model.identityMap
+                # for dim in range(3):
+                #     phi[0, dim, ...] = phi[0, dim, ...] / self.model.spacing[dim]
 
-                ct_image_name = self.img_list[j].split(' ')[0]
-                cb_image_name = self.img_list[j].split(' ')[1]
-
-                result_folder = os.path.join(self.test_folder, '{}__to_{}'.format(ct_image_name.split('all/')[1].replace('/', '_'),
-                                                                                 cb_image_name.split('all')[1].replace('/', '_')))
-                print("Result folder: {}".format(result_folder))
-                os.system('mkdir {}'.format(result_folder))
+                result_folder = os.path.join(self.test_folder,
+                                             '{}__to_{}'.format(ct_image_name.split('images/')[1].replace('/', '_'),
+                                                                cb_image_name.split('images')[1].replace('/', '_')))
+                # print("Result folder: {}".format(re09876sult_folder))
+                os.system('mkdir -p {}'.format(result_folder))
                 orig_image_itk = sitk.ReadImage(ct_image_name)
 
                 orig_image_arr = sitk.GetArrayFromImage(orig_image_itk)
                 [depth, height, width] = orig_image_arr.shape
-                print("Original image shape: {}".format(orig_image_arr.shape))
+                # print("Original image shape: {}".format(orig_image_arr.shape))
                 scale = [depth * 1.0 / self.settings.input_D,
                          height * 1.0 / self.settings.input_H * 1.0,
                          width * 1.0 / self.settings.input_W * 1.0]
@@ -165,9 +170,9 @@ class TestR21:
                 orig_warped_image = F.interpolate(warped_image, scale_factor=scale, mode='trilinear')
                 orig_warped_sblabel = F.interpolate(warped_sblabel, scale_factor=scale, mode='nearest')
                 orig_warped_sdlabel = F.interpolate(warped_sdlabel, scale_factor=scale, mode='nearest')
-                orig_phi_x = F.interpolate(phi[:, [0], ...], scale_factor=scale, mode='trilinear')
-                orig_phi_y = F.interpolate(phi[:, [1], ...], scale_factor=scale, mode='trilinear')
-                orig_phi_z = F.interpolate(phi[:, [2], ...], scale_factor=scale, mode='trilinear')
+                # orig_phi_x = F.interpolate(phi[:, [0], ...], scale_factor=scale, mode='trilinear')
+                # orig_phi_y = F.interpolate(phi[:, [1], ...], scale_factor=scale, mode='trilinear')
+                # orig_phi_z = F.interpolate(phi[:, [2], ...], scale_factor=scale, mode='trilinear')
 
                 orig_warped_image_itk = sitk.GetImageFromArray(torch.squeeze(orig_warped_image).cpu().numpy())
                 orig_warped_image_itk.CopyInformation(orig_image_itk)
@@ -191,13 +196,12 @@ class TestR21:
                 all_labels_file = os.path.join(result_folder, 'warped_labels.nii.gz')
                 sitk.WriteImage(sitk.Cast(all_labels_itk, sitk.sitkUInt8), all_labels_file)
 
-                orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
-                print("Transformation map shape: {}".format(orig_phi.shape))
-                orig_phi_itk = sitk.GetImageFromArray(torch.squeeze(orig_phi).cpu().numpy(), isVector=True)
-                orig_phi_itk.CopyInformation(orig_image_itk)
-                orig_phi_file = os.path.join(result_folder, 'phi.nii')
-                sitk.WriteImage(orig_phi_itk, orig_phi_file)
-
+                # orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
+                # print("Transformation map shape: {}".format(orig_phi.shape))
+                # orig_phi_itk = sitk.GetImageFromArray(torch.squeeze(orig_phi).cpu().numpy(), isVector=True)
+                # orig_phi_itk.CopyInformation(orig_image_itk)
+                # orig_phi_file = os.path.join(result_folder, 'phi.nii')
+                # sitk.WriteImage(orig_phi_itk, orig_phi_file)
 
                 ct_sblabel = self.img_list[j].split(' ')[3]
                 ct_sblabel_arr = sitk.GetArrayFromImage(sitk.ReadImage(ct_sblabel))
@@ -212,27 +216,50 @@ class TestR21:
                 roi_label = self.img_list[j].split(' ')[2]
                 roi_arr = sitk.GetArrayFromImage(sitk.ReadImage(roi_label))
 
-                sm_label_bef = self.__calculate_dice_socre__(cb_sblabel_arr, ct_sblabel_arr, roi_arr)
-                sd_label_bef = self.__calculate_dice_socre__(cb_sdlabel_arr, ct_sblabel_arr, roi_arr)
-
-                sm_label_dice = self.__calculate_dice_socre__(orig_warped_sblabel_arr, ct_sblabel_arr, roi_arr)
-                sd_label_dice = self.__calculate_dice_socre__(orig_warped_sdlabel_arr, ct_sdlabel_arr, roi_arr)
-                f.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('all/')[1].replace('/', '_'),
-                                                             cb_image_name.split('all')[1].replace('/', '_'),
+                sm_label_bef = self.__calculate_dice_score__(cb_sblabel_arr, ct_sblabel_arr, roi_arr)
+                sd_label_bef = self.__calculate_dice_score__(cb_sdlabel_arr, ct_sdlabel_arr, roi_arr)
+                # sm_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sblabel).cpu().numpy(),
+                #                                               torch.squeeze(images[3]).numpy(),
+                #                                               torch.squeeze(images[2]).numpy())
+                # sd_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sdlabel).cpu().numpy(),
+                #                                               torch.squeeze(images[4]).numpy(),
+                #                                               torch.squeeze(images[2]).numpy())
+                sm_label_dice = self.__calculate_dice_score__(orig_warped_sblabel_arr, ct_sblabel_arr, roi_arr)
+                sd_label_dice = self.__calculate_dice_score__(orig_warped_sdlabel_arr, ct_sdlabel_arr, roi_arr)
+                print('{}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
+                                                      sd_label_bef,
+                                                      sm_label_dice,
+                                                      sd_label_dice))
+                f.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('images/')[1].replace('/', '_'),
+                                                             cb_image_name.split('images')[1].replace('/', '_'),
                                                              sm_label_bef,
                                                              sd_label_bef,
                                                              sm_label_dice,
                                                              sd_label_dice))
 
+                # sm_label_bef = self.__calculate_dice_score__(cb_sblabel_arr, ct_sblabel_arr)
+                # sd_label_bef = self.__calculate_dice_score__(cb_sdlabel_arr, ct_sdlabel_arr)
+                # # sm_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sblabel).cpu().numpy(),
+                # #                                               torch.squeeze(images[3]).numpy(),
+                # #                                               torch.squeeze(images[2]).numpy())
+                # # sd_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sdlabel).cpu().numpy(),
+                # #                                               torch.squeeze(images[4]).numpy(),
+                # #                                               torch.squeeze(images[2]).numpy())
+                # sm_label_dice = self.__calculate_dice_score__(orig_warped_sblabel_arr, ct_sblabel_arr)
+                # sd_label_dice = self.__calculate_dice_score__(orig_warped_sdlabel_arr, ct_sdlabel_arr)
+                # # print('{}, {}, {}, {}'.format(sm_label_bef,
+                # #                               sd_label_bef,
+                # #                               sm_label_dice,
+                # #                               sd_label_dice))
+                # f2.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('images/')[1].replace('/', '_'),
+                #                                               cb_image_name.split('images')[1].replace('/', '_'),
+                #                                               sm_label_bef,
+                #                                               sd_label_bef,
+                #                                               sm_label_dice,
+                #                                               sd_label_dice))
+
         f.close()
-
-
-
-
-
-
-
-
+        # f2.close()
 
 
 if __name__ == '__main__':

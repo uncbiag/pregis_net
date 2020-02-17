@@ -5,13 +5,13 @@ def parse_opts():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--train_list',
-        default='./data/ct_cbct/train_1.txt',
+        default='./data/ct_cbct/sample_train.txt',
         type=str,
         help='Path for training image list file'
     )
     parser.add_argument(
         '--test_list',
-        default='./data/ct_cbct/test_1.txt',
+        default='./data/ct_cbct/sample_test.txt',
         type=str,
         help='Path for testing image list file'
     )
@@ -39,12 +39,12 @@ def parse_opts():
     parser.add_argument(
         '--manual_seed', default=1, type=int, help='Manually set random seed')
     parser.add_argument(
-        '--network_name', default='model_20200110-004502',
+        '--network_name', default='',
         type=str,
         help="Trained model name, not saved torch file (see saved_model)"
     )
     parser.add_argument(
-        '--saved_model', default='best_eval.pth.tar',
+        '--saved_model', default='',
         type=str,
         help="Saved torch file, not trained model (see network_name)"
     )

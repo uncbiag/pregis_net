@@ -7,13 +7,11 @@ import socket
 from tensorboardX import SummaryWriter
 from utils.visualize import make_image_summary
 from setting import parse_opts
-import pyreg.fileio as py_fio
 
 torch.backends.cudnn.benchmark = True
 
 
 class TrainR21:
-
     def __init__(self):
         self.dataset = 'ct_cbct'
 
@@ -45,6 +43,7 @@ class TrainR21:
         # load models
         self.train_data_loader = None
         self.validate_data_loader = None
+        #self.test_data_loader = None
         self.model = None
         self.optimizer = None
         self.scheduler = None
@@ -89,6 +88,9 @@ class TrainR21:
             os.system('cp ' + self.mermaid_config_file + ' ' + os.path.join(self.network_folder, 'mermaid_config.json'))
             self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
             os.system('mkdir -p ' + self.log_folder)
+            os.system('cp ' + self.settings.train_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.train_list)))
+            os.system('cp ' + self.settings.test_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.test_list)))
+            
         with open(self.network_config_file) as f:
             self.network_config = json.load(f)
 
@@ -103,6 +105,7 @@ class TrainR21:
         batch_size = self.network_config['train']['batch_size']
         iters_per_epoch = len(self.train_data_loader.dataset) // batch_size
         val_iters_per_epoch = len(self.validate_data_loader.dataset) // batch_size
+        # test_iters_per_epoch = len(self.test_data_loader.dataset) // batch_size
         summary_batch_period = min(self.network_config['train']['min_summary_period'], iters_per_epoch)
         validate_epoch_period = self.network_config['validate']['validate_epoch_period']
 
@@ -287,9 +290,9 @@ class TrainR21:
                 )
                 print(to_print)
                 if min_val_loss == 0.0 and current_epoch >= 20:
-                    min_val_loss = eval_loss_dict['mermaid_all_loss']
-                if eval_loss_dict['mermaid_all_loss'] < min_val_loss:
-                    min_val_loss = eval_loss_dict['mermaid_all_loss']
+                    min_val_loss = eval_loss_dict['mermaid_sim_loss']
+                if eval_loss_dict['mermaid_sim_loss'] < min_val_loss:
+                    min_val_loss = eval_loss_dict['mermaid_sim_loss']
                     save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
                     print("Writing current best eval model")
                     torch.save({'epoch': current_epoch,
@@ -304,7 +307,76 @@ class TrainR21:
                                 'optimizer_state_dict': self.optimizer.state_dict()},
                                save_file)
                 writer.flush()
+                
+                """
+                test_loss_dict = {
+                    'all_loss': 0.0,
+                    'mermaid_all_loss': 0.0,
+                    'mermaid_reg_loss': 0.0,
+                    'mermaid_sim_loss': 0.0,
+                    'dice_SmLabel': 0.,
+                    'dice_SdLabel': 0.,
+                }
+
+                with torch.no_grad():
+                    test_index = np.random.randint(0, len(self.test_data_loader))
+                    for j, images in enumerate(self.test_data_loader, 0):
+                        ct_image = images[0].cuda()
+                        cb_image = images[1].cuda()
+                        roi_label = images[2].cuda()
+                        ct_sblabel = images[3].cuda()
+                        ct_sdlabel = images[4].cuda()
+                        cb_sblabel = images[5].cuda()
+                        cb_sdlabel = images[6].cuda()
+                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
+
+                        loss_dict = self.model.loss_dict
+                        for loss_key in test_loss_dict:
+                            if loss_key in loss_dict:
+                                test_loss_dict[loss_key] += loss_dict[loss_key].item()
+
+                        if j == test_index:
+                            # view validation result
+                            images_to_show = {
+                                "ct_image": ct_image.cpu(),
+                                "cb_image": cb_image.cpu(),
+                                "warped_image": self.model.warped_image.detach().cpu()
+                            }
+                            labels_to_show = {
+                                "ct_sblabel": ct_sblabel.cpu(),
+                                "ct_sdlabel": ct_sdlabel.cpu(),
+                                "cb_sblabel": cb_sblabel.cpu(),
+                                "cb_sdlabel": cb_sdlabel.cpu(),
+                                "warped_sblabel": self.model.warped_labels.detach().cpu()[:, [0], ...],
+                                "warped_sdlabel": self.model.warped_labels.detach().cpu()[:, [1], ...],
+                                "roi_label": roi_label.cpu()
+                            }
+
+                            phis_to_show = [self.model.phi.detach().cpu()]
+
+                            image_summary = make_image_summary(images_to_show, labels_to_show, phis_to_show)
+                            for key, value in image_summary.items():
+                                writer.add_image("test_" + key, value, global_step=current_epoch)
+
+                for loss_key in test_loss_dict:
+                    writer.add_scalar('test/test_{}'.format(loss_key),
+                                      test_loss_dict[loss_key] / test_iters_per_epoch, global_step=current_epoch)
+
+                to_print = "TEST>{:0d}, all_loss:{:.6f}".format(current_epoch + 1,
+                                                                test_loss_dict['all_loss'] /test_iters_per_epoch)
+                to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}, dice_sm:{:.6f}, dice_sd:{:.6f}".format(
+                    test_loss_dict['mermaid_all_loss'] / test_iters_per_epoch,
+                    test_loss_dict['mermaid_sim_loss'] / test_iters_per_epoch,
+                    test_loss_dict['mermaid_reg_loss'] / test_iters_per_epoch,
+                    test_loss_dict['dice_SmLabel'] / test_iters_per_epoch,
+                    test_loss_dict['dice_SdLabel'] / test_iters_per_epoch
+                )
+                print(to_print)
+                writer.flush()
+                """
+
             current_epoch = current_epoch + 1
+
 
 if __name__ == '__main__':
     network = TrainR21()

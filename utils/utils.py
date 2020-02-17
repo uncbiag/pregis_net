@@ -221,16 +221,19 @@ def create_model(network_config):
 def create_dataloader(network_config, settings):
     model_config = network_config['model']
     train_dataset = R21RegDataset(settings, 'train')
-    test_dataset = R21RegDataset(settings, 'test')
+    validate_dataset = R21RegDataset(settings, 'validate')
+    #test_dataset = R21RegDataset(settings, 'test')
 
     train_dataloader = DataLoader(train_dataset, batch_size=network_config['train']['batch_size'], shuffle=True,
                                   drop_last=True, num_workers=4)
-    test_dataloader = DataLoader(test_dataset, batch_size=network_config['train']['batch_size'], shuffle=False,
-                                 drop_last=False, num_workers=4)
+    validate_dataloader = DataLoader(validate_dataset, batch_size=network_config['train']['batch_size'], shuffle=False,
+                                     drop_last=False, num_workers=4)
+    #test_dataloader = DataLoader(test_dataset, batch_size=network_config['train']['batch_size'], shuffle=False,
+                                 #drop_last=False, num_workers=4)
     model_config['img_sz'] = [network_config['train']['batch_size'], 1, settings.input_D, settings.input_H,
                               settings.input_W]
     model_config['dim'] = 3
-    return train_dataloader, test_dataloader
+    return train_dataloader, validate_dataloader
 
 
 def create_optimizer(config, model):

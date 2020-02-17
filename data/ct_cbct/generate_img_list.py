@@ -4,7 +4,7 @@ import glob
 import numpy as np
 from sklearn.model_selection import KFold
 from operator import itemgetter
-
+import socket
 
 def generate_img_list(patients, indices, mode='train'):
     patients = itemgetter(*indices)(patients)
@@ -33,8 +33,27 @@ def generate_img_list(patients, indices, mode='train'):
 
 
 if __name__ == '__main__':
+<<<<<<< HEAD
     root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images"
     patients = sorted(glob.glob(os.path.join(root_folder, '18227??')))
+=======
+    root_folder = None
+    hostname = socket.gethostname()
+
+    np.random.seed(1)
+
+    if hostname == 'biag-w05.cs.unc.edu':
+        root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images/all"
+    elif hostname == 'biag-gpu1.cs.unc.edu':
+        root_folder = "/playpen-raid1/xhs400/data/r21/all"
+    else:
+        raise ValueError("Wrong host")
+    assert root_folder is not None
+
+
+    patients = sorted(glob.glob(os.path.join(root_folder, '18227*')))
+    print(patients)
+>>>>>>> 51b9ac174081804b00637e8932ce0d5923b97137
 
     kf = KFold(n_splits=5, shuffle=True)
     fold = 1
@@ -46,7 +65,11 @@ if __name__ == '__main__':
         train_f.write(train_line)
         train_f.close()
 
+<<<<<<< HEAD
         test_line = generate_img_list(patients, test_index, 'test')
+=======
+        test_line = generate_img_list(patients, test_index)
+>>>>>>> 51b9ac174081804b00637e8932ce0d5923b97137
         test_file = "test_{}.txt".format(fold)
         test_f = open(test_file, 'w')
         test_f.write(test_line)

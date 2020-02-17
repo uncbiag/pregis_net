@@ -69,7 +69,7 @@ def make_image_summary(images_to_show, labels_to_show, phis_to_show, n_samples=1
 
                 for label_name, label in labels_to_show.items():
                     label_slice = torch.squeeze(torch.select(label[n, :, :, :, :], axis, slice_idx))
-                    _, contours, _ = cv2.findContours(label_slice.numpy().astype(np.uint8), mode=cv2.RETR_EXTERNAL,
+                    contours, _ = cv2.findContours(label_slice.numpy().astype(np.uint8), mode=cv2.RETR_EXTERNAL,
                                                       method=cv2.CHAIN_APPROX_SIMPLE)
                     contour_dict[label_name] = contours
 

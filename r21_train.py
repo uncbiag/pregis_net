@@ -292,9 +292,9 @@ class TrainR21:
                 )
                 print(to_print)
                 if min_val_loss == 0.0 and current_epoch >= 20:
-                    min_val_loss = eval_loss_dict['mermaid_sim_loss']
-                if eval_loss_dict['mermaid_sim_loss'] < min_val_loss:
-                    min_val_loss = eval_loss_dict['mermaid_sim_loss']
+                    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
+                if eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel'] > min_val_loss:
+                    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
                     save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
                     print("Writing current best eval model")
                     torch.save({'epoch': current_epoch,

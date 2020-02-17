@@ -117,7 +117,7 @@
                         ]
                     ]
                 },
-                "sigma": 0.5,
+                "sigma": 1.0,
                 "type": "custlncc"
             },
             "spline_order": 1,

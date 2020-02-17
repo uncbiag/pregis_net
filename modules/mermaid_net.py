@@ -144,7 +144,7 @@ class MermaidNet(nn.Module):
         cb_image_n_and_label = torch.cat((cb_image_n, cb_sblabel, cb_sdlabel), dim=1)
         ct_image_n_and_label = torch.cat((ct_image_n, ct_sblabel, ct_sdlabel), dim=1)
         # add ROI to target space
-        cb_image_n_and_label = torch.cat((cb_image_n_and_label, roi_label), dim=1)
+        ct_image_n_and_label = torch.cat((ct_image_n_and_label, roi_label), dim=1)
 
 
         init_map = self.identityMap
@@ -158,7 +158,7 @@ class MermaidNet(nn.Module):
         }
         momentum = self.__network_forward__(ct_image, cb_image, ct_labels, roi_label)
         
-        warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels, momentum=momentum, init_map=init_map)
+        warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=cb_image_n, moving_labels=cb_labels, momentum=momentum, init_map=init_map)
         init_map = phi
         self.phi = phi
 
@@ -166,15 +166,15 @@ class MermaidNet(nn.Module):
         warped_image = warped_image_n * 2 - 1
         self.warped_image = warped_image
         self.warped_labels = warped_labels
-        all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=ct_image_n_and_label,
-                                                                 target_image_and_label=cb_image_n_and_label)
+        all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=cb_image_n_and_label,
+                                                                 target_image_and_label=ct_image_n_and_label)
         self.loss_dict['mermaid_all_loss'] = all_loss / self.batch_size
         self.loss_dict['mermaid_sim_loss'] = sim_loss / self.batch_size
         self.loss_dict['mermaid_reg_loss'] = reg_loss / self.batch_size
 
         self.loss_dict['all_loss'] = self.loss_dict['mermaid_all_loss']
 
-        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_labels.detach(), cb_labels, roi_label)
+        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_labels.detach(), ct_labels, roi_label)
         self.loss_dict['dice_SmLabel'] = sm_label_dice / self.batch_size
         self.loss_dict['dice_SdLabel'] = sd_label_dice / self.batch_size
 
@@ -198,9 +198,10 @@ class MermaidNet(nn.Module):
         return warped_image, warped_labels, phi
 
     def __network_forward__(self, ct_image, cb_image, ct_labels, roi_label):
-        x = torch.cat((ct_image, cb_image, ct_labels, roi_label), dim = 1)
-        x = self.ec_1(x)
-        x_l1 = self.ec_2(x)
+        x1 = torch.cat((ct_image, ct_labels, roi_label), dim = 1)
+        x1 = self.ec_1(x1)
+        x2 = self.ec_2(cb_image)
+        x_l1 = torch.cat((x1,x2), dim=1)
         x = self.ec_3(x_l1)
         x = self.ec_4(x)
         x_l2 = self.ec_5(x)
@@ -230,9 +231,9 @@ class MermaidNet(nn.Module):
         return output
 
     def __setup_network_structure__(self):
-        self.ec_1 = ConBnRelDp(5, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.ec_1 = ConBnRelDp(4, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
-        self.ec_2 = ConBnRelDp(8, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
+        self.ec_2 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)
         self.ec_3 = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp)

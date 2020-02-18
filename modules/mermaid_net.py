@@ -13,7 +13,7 @@ import pyreg.utils as py_utils
 import pyreg.similarity_measure_factory as smf
 from pyreg.external_variable import *
 from utils.registration_method import _get_low_res_size_from_size, _get_low_res_spacing_from_spacing, \
-     get_resampled_image
+    get_resampled_image
 from functools import partial
 
 
@@ -102,7 +102,7 @@ class MermaidNet(nn.Module):
         roi_indices = (mask > 0.5)
         predicted_in_mask = predicted_label[roi_indices]
         target_in_mask = target_label[roi_indices]
-        intersection = (predicted_in_mask * target_in_mask) .sum()
+        intersection = (predicted_in_mask * target_in_mask).sum()
         smooth = 1.
         dice = (2 * intersection + smooth) / (predicted_in_mask.sum() + target_in_mask.sum() + smooth)
         return dice
@@ -143,13 +143,13 @@ class MermaidNet(nn.Module):
         # moving: CT, target: CBCT
         cb_image_n_and_label = torch.cat((cb_image_n, cb_sblabel, cb_sdlabel), dim=1)
         ct_image_n_and_label = torch.cat((ct_image_n, ct_sblabel, ct_sdlabel), dim=1)
-        # add ROI to target space
-        ct_image_n_and_label = torch.cat((ct_image_n_and_label, roi_label), dim=1)
 
+        # add ROI to target space
+        cb_image_n_and_label = torch.cat((cb_image_n_and_label, roi_label), dim=1)
 
         init_map = self.identityMap
         self.loss_dict = {
-            'all_loss':  0.,
+            'all_loss': 0.,
             'mermaid_all_loss': 0.,
             'mermaid_sim_loss': 0.,
             'mermaid_reg_loss': 0.,
@@ -157,24 +157,25 @@ class MermaidNet(nn.Module):
             'dice_SdLabel': 0.,
         }
         momentum = self.__network_forward__(ct_image, cb_image, ct_labels, roi_label)
-        
-        warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=cb_image_n, moving_labels=cb_labels, momentum=momentum, init_map=init_map)
-        init_map = phi
+
+        warped_image_n, warped_labels, phi = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels,
+                                                                    momentum=momentum, init_map=init_map)
         self.phi = phi
 
         # warped_image_n : [0, 1], warped_image: [-1, 1]
         warped_image = warped_image_n * 2 - 1
         self.warped_image = warped_image
         self.warped_labels = warped_labels
-        all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=cb_image_n_and_label,
-                                                                 target_image_and_label=ct_image_n_and_label)
+        all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=ct_image_n_and_label,
+                                                                 target_image_and_label=cb_image_n_and_label)
         self.loss_dict['mermaid_all_loss'] = all_loss / self.batch_size
         self.loss_dict['mermaid_sim_loss'] = sim_loss / self.batch_size
         self.loss_dict['mermaid_reg_loss'] = reg_loss / self.batch_size
 
         self.loss_dict['all_loss'] = self.loss_dict['mermaid_all_loss']
 
-        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_labels.detach(), ct_labels, roi_label)
+        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_labels.detach(), cb_labels,
+                                                                          roi_label)
         self.loss_dict['dice_SmLabel'] = sm_label_dice / self.batch_size
         self.loss_dict['dice_SdLabel'] = sd_label_dice / self.batch_size
 
@@ -198,10 +199,10 @@ class MermaidNet(nn.Module):
         return warped_image, warped_labels, phi
 
     def __network_forward__(self, ct_image, cb_image, ct_labels, roi_label):
-        x1 = torch.cat((ct_image, ct_labels, roi_label), dim = 1)
+        x1 = torch.cat((ct_image, ct_labels, roi_label), dim=1)
         x1 = self.ec_1(x1)
         x2 = self.ec_2(cb_image)
-        x_l1 = torch.cat((x1,x2), dim=1)
+        x_l1 = torch.cat((x1, x2), dim=1)
         x = self.ec_3(x_l1)
         x = self.ec_4(x)
         x_l2 = self.ec_5(x)
@@ -274,4 +275,3 @@ class MermaidNet(nn.Module):
                                 use_bn=self.use_bn, use_dp=self.use_dp)
         self.dc_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.dc_23 = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
-

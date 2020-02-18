@@ -4,50 +4,54 @@
    contain the root `toctree` directive.
 
 mermaid: iMagE Registration via autoMAtIc Differentiation [*]_
-============================================================
+==============================================================
+
+*mermaid* is a registration toolbox, which supports various image registration methods. In particular, it focuses on nonparametric registration approaches (including stationary velocity fields and large discplacement diffeomorphic metric mapping models) though simple affine registration is also possible. As it is entirely written in *pyTorch* it allows for rapid prototyping of new image registration approaches and similiarity measures. To keep track of registration parameters it makes use of json configuration files which entirely describe registration algorithms. *mermaid* provides optimization-based registration approaches, but the companion-package *easyreg* (https://github.com/uncbiag/easyreg) adds support for deep-learning registration models by building on top of *mermaid's* transformation models.
+
+*mermaid* was primarily developed by:
+
+  - Marc Niethammer
+  - Zhengyang Shen
+  - Roland Kwitt
+
 
 .. toctree::
    :glob:
    :maxdepth: 1
    :caption: Notes
-
-   notes/*
-
+	     
+   notes/installation.rst
+   notes/parameters.rst
+   notes/settings.rst
+   notes/todos.rst
+   notes/howto_own_registration.rst
+   notes/simple_example.rst
+   notes/step_by_step_registration_example.rst
+   notes/rdmm_example.rst
+   example_gallery.rst
+   
 .. toctree::
    :maxdepth: 1
-   :caption: Package Reference
+   :caption: Jupyter notebook examples
 
-   config_parser
-   custom_optimizers
-   custom_pytorch_extensions
-   data_wrapper
-   deep_networks
-   deep_smoothers
-   example_generation
-   fileio
-   finite_differences
-   forward_models
-   image_manipulations
-   image_sampling
-   load_default_settings
-   model_evaluation
-   model_factory
-   module_parameters
-   multiscale_optimizer
-   noisy_convolution
-   optimizer_data_loaders
-   registration_networks
-   regularizer_factory
-   rungekutta_integrators
-   similarity_helper_omt
-   similarity_measure_factory
+   jupyter/example_simple_interface.ipynb
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Package reference
+
    simple_interface
-   spline_interpolation
-   smoother_factory
-   stn
-   utils
-   viewers
-   visualize_registration_results
+   registration_models
+   similarity_measures
+   basic_numerics
+   optimizers
+   visualization
+   configurations
+   image_io
+   regularization_and_smoothing
+   utilities
+   deep_networks
+   
 
 Indices and tables
 ==================

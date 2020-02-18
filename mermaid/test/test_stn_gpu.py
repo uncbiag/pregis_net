@@ -4,8 +4,8 @@ from __future__ import print_function
 import os
 import sys
 sys.path.insert(0,os.path.abspath('..'))
-sys.path.insert(0,os.path.abspath('../pyreg'))
-sys.path.insert(0,os.path.abspath('../pyreg/libraries'))
+sys.path.insert(0,os.path.abspath('../mermaid'))
+sys.path.insert(0,os.path.abspath('../mermaid/libraries'))
 
 import torch
 from cffi import FFI
@@ -16,7 +16,7 @@ import numpy as np
 import numpy.testing as npt
 import torch
 
-from pyreg.libraries.functions.stn_nd import STNFunction_ND_BCXYZ
+from mermaid.libraries.functions.stn_nd import STNFunction_ND_BCXYZ
 
 import unittest
 import imp
@@ -196,6 +196,7 @@ class Test_stn_3d(unittest.TestCase):
 
 
 if __name__ == '__main__':
+    raise("this test is for cuda version stn, since pytorch provide official support, it is no longer maintained")
     if foundHTMLTestRunner:
         if torch.cuda.device_count()==0:
             print('No CUDA devices found. Ignoring test.')

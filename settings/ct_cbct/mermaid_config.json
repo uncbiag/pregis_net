@@ -7,10 +7,11 @@
         },
         "registration_model": {
             "forward_model": {
+                "number_of_time_steps": 10,
+                "solver": "rk4",
                 "adjoin_on": true,
-                "atol": 1e-05,
-                "number_of_time_steps": 20,
-                "rtol": 1e-05,
+                "rtol": 1e-5,
+                "atol": 1e-5,
                 "smoother": {
                     "multi_gaussian_stds": [
                         0.05,
@@ -29,139 +30,37 @@
                     "type": "multiGaussian"
                 },
                 "smoother_for_forward": {
-                    "multi_gaussian_stds": [
-                        0.05,
-                        0.1,
-                        0.15,
-                        0.2,
-                        0.25
-                    ],
-                    "multi_gaussian_weights": [
-                        0.06666666666666667,
-                        0.13333333333333333,
-                        0.19999999999999998,
-                        0.26666666666666666,
-                        0.3333333333333333
-                    ],
                     "type": "multiGaussian"
-                },
-                "solver": "rk4"
+                }
             },
-            "load_velocity_from_forward_model": false,
             "loss": {
                 "display_max_displacement": false,
                 "limit_displacement": false,
-                "max_displacement": 0.1
+                "max_displacement": 0.05
             },
             "similarity_measure": {
                 "develop_mod_on": false,
-                "lncc": {
-                    "dilation": [
-                        [
-                            2,
-                            2,
-                            2
-                        ],
-                        [
-                            2,
-                            2
-                        ],
-                        [
-                            1
-                        ]
-                    ],
-                    "kernel_size_ratio": [
-                        [
-                            0.0625,
-                            0.125,
-                            0.25
-                        ],
-                        [
-                            0.25,
-                            0.5
-                        ],
-                        [
-                            0.5
-                        ]
-                    ],
-                    "kernel_weight_ratio": [
-                        [
-                            0.1,
-                            0.3,
-                            0.6
-                        ],
-                        [
-                            0.3,
-                            0.7
-                        ],
-                        [
-                            1.0
-                        ]
-                    ],
-                    "resol_bound": [
-                        128,
-                        64
-                    ],
-                    "stride": [
-                        [
-                            0.25,
-                            0.25,
-                            0.25
-                        ],
-                        [
-                            0.25,
-                            0.25
-                        ],
-                        [
-                            0.25
-                        ]
-                    ]
-                },
                 "sigma": 1.0,
-                "type": "custlncc"
+                "type": "custlncc",
+                "lncc":{
+                    "resol_bound":[128,64],
+                    "kernel_size_ratio":[[0.0625,0.125, 0.25], [0.25,0.5], [0.5]],
+                    "kernel_weight_ratio":[[0.1, 0.3, 0.6],[0.3,0.7],[1.0]],
+                    "stride":[[0.25,0.25,0.25],[0.25,0.25],[0.25]],
+                    "dilation":[[2,2,2],[2,2],[1]]
+                }
             },
+            "load_velocity_from_forward_model":true,
             "spline_order": 1,
             "type": "svf_vector_momentum_map",
-            "use_CFL_clamping": true
+            "env":{
+                "get_momentum_from_external_network":true,
+                "use_odeint":true,
+                "reg_factor":1.0
+                },
+            "shooting_vector_momentum":{
+                "use_velocity_mask_on_boundary":false
+            }
         }
-    },
-    "optimizer": {
-        "gradient_clipping": {
-            "clip_display": true,
-            "clip_individual_gradient": true,
-            "clip_individual_gradient_value": 1.0043103448275863,
-            "clip_shared_gradient": false,
-            "clip_shared_gradient_value": 1.0
-        },
-        "lbfgs": {
-            "history_size": 5,
-            "line_search_fn": "backtracking",
-            "max_eval": 5,
-            "max_iter": 1
-        },
-        "multi_scale": {
-            "scale_factors": [
-                1.0,
-                0.5,
-                0.25
-            ],
-            "scale_iterations": [
-                100,
-                100,
-                100
-            ]
-        },
-        "name": "lbfgs_ls",
-        "scheduler": {
-            "factor": 0.5,
-            "patience": 10,
-            "verbose": true
-        },
-        "single_scale": {
-            "rel_ftol": 1e-10
-        },
-        "use_step_size_scheduler": true,
-        "weight_clipping_type": "None",
-        "weight_clipping_value": 1.0
     }
 }

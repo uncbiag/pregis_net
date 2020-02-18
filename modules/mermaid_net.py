@@ -7,11 +7,10 @@ import sys
 import os
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '../mermaid'))
-import pyreg.module_parameters as pars
-import pyreg.model_factory as py_mf
-import pyreg.utils as py_utils
-import pyreg.similarity_measure_factory as smf
-from pyreg.external_variable import *
+import mermaid.module_parameters as pars
+import mermaid.model_factory as py_mf
+import mermaid.utils as py_utils
+import mermaid.similarity_measure_factory as smf
 from utils.registration_method import _get_low_res_size_from_size, _get_low_res_spacing_from_spacing, \
     get_resampled_image
 from functools import partial
@@ -186,7 +185,7 @@ class MermaidNet(nn.Module):
         # warp image and labels
         self.mermaid_unit.m = momentum
         self.mermaid_criterion.m = momentum
-        low_res_phi = self.mermaid_unit(self.lowRes_fn(init_map))
+        low_res_phi = self.mermaid_unit(self.lowRes_fn(init_map), I0_source=moving_image)
         desired_sz = self.identityMap.size()[2:]
         phi = get_resampled_image(low_res_phi,
                                   self.lowResSpacing,

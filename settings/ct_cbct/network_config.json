@@ -3,7 +3,7 @@
         "pregis_net":{
             "n_of_feature": 32,
             "bn": true,
-            "dp": true,
+            "dp": false,
             "dp_p": 0.2
         }
     },

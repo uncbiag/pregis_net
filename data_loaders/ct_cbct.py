@@ -292,7 +292,7 @@ class R21RegDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        if self.mode == "train" or self.mode == 'validate':
+        if self.mode == "train":
             # read image and labels
             ith_info = self.img_list[idx].split(" ")
             ct_img_name = ith_info[0]
@@ -313,12 +313,12 @@ class R21RegDataset(Dataset):
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
             roi2_lbl_arr = blosc.unpack_array(self.img_dict[roi2_lbl_name])
 
-            ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
-            cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
+            #ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
+            #cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
 
             return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
 
-        elif self.mode == "test":
+        elif self.mode == 'validate' or self.mode == "test":
             # read image and labels
             ith_info = self.img_list[idx].split(" ")
             ct_img_name = ith_info[0]

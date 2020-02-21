@@ -80,7 +80,7 @@ class ConBnRelDp(nn.Module):
             self.activate_unit = nn.Sigmoid()
         else:
             self.activate_unit = False
-        self.drop_out = drop_out(0.2) if use_dp else False
+        self.drop_out = drop_out(0.4) if use_dp else False
 
         return
 

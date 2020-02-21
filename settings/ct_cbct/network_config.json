@@ -10,7 +10,7 @@
     "train":{
         "dataset": "ct_cbct",
         "dataset_type": "with_contours",
-        "n_of_epochs":500,
+        "n_of_epochs":400,
         "batch_size":4,
         "min_summary_period":8,
         "optimizer":{
@@ -20,11 +20,11 @@
             "scheduler":{
                 "multistepLR": {
                     "milestones": [
-                        300,
-                        500,
-                        800
+                        50,
+                        100,
+                        200
                     ],
-                    "gamma": 1
+                    "gamma": 0.5
                 },
                 "CosineAnnealingWarmRestarts": {
                     "T_0": 500,

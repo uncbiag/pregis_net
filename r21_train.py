@@ -21,6 +21,8 @@ class TrainR21:
         self.time = None
         # specify continue training or new training
         self.is_continue = False
+        if self.settings.network_name != "" and self.settings.saved_model != "":
+            self.is_continue = True
         self.root_folder = None
 
         hostname = socket.gethostname()
@@ -144,8 +146,10 @@ class TrainR21:
                 'mermaid_all_loss': 0.0,
                 'mermaid_reg_loss': 0.0,
                 'mermaid_sim_loss': 0.0,
-                'dice_SmLabel': 0.,
-                'dice_SdLabel': 0.,
+                'dice_SmLabel_in_CT': 0.,
+                'dice_SdLabel_in_CT': 0.,
+                'dice_SmLabel_in_CB': 0.,
+                'dice_SdLabel_in_CB': 0.,
             }
 
             # self.scheduler.step(epoch=current_epoch + 1)
@@ -164,7 +168,8 @@ class TrainR21:
                 ct_sdlabel = images[4].cuda()
                 cb_sblabel = images[5].cuda()
                 cb_sdlabel = images[6].cuda()
-                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
+                roi2_label = images[7].cuda()
+                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
 
                 loss_dict = self.model.loss_dict
                 loss_dict['mermaid_all_loss'].backward()
@@ -191,22 +196,22 @@ class TrainR21:
                         epoch_loss_dict['mermaid_all_loss'] / summary_batch_period,
                         epoch_loss_dict['mermaid_sim_loss'] / summary_batch_period,
                         epoch_loss_dict['mermaid_reg_loss'] / summary_batch_period,
-                        epoch_loss_dict['dice_SmLabel'] / summary_batch_period,
-                        epoch_loss_dict['dice_SdLabel'] / summary_batch_period
+                        epoch_loss_dict['dice_SmLabel_in_CB'] / summary_batch_period,
+                        epoch_loss_dict['dice_SdLabel_in_CB'] / summary_batch_period
                     )
 
                     images_to_show = {
                         "ct_image": ct_image.cpu(),
                         "cb_image": cb_image.cpu(),
-                        "warped_image": self.model.warped_image.detach().cpu()
+                        "warped_image": self.model.warped_moving_image.detach().cpu()
                     }
                     labels_to_show = {
                         "ct_sblabel": ct_sblabel.cpu(),
                         "ct_sdlabel": ct_sdlabel.cpu(),
                         "cb_sblabel": cb_sblabel.cpu(),
                         "cb_sdlabel": cb_sdlabel.cpu(),
-                        "warped_sblabel": self.model.warped_labels.detach().cpu()[:, [0], ...],
-                        "warped_sdlabel": self.model.warped_labels.detach().cpu()[:, [1], ...],
+                        "warped_sblabel": self.model.warped_moving_labels.detach().cpu()[:, [0], ...],
+                        "warped_sdlabel": self.model.warped_moving_labels.detach().cpu()[:, [1], ...],
                         "roi_label": roi_label.cpu()
                     }
 
@@ -222,8 +227,10 @@ class TrainR21:
                         'mermaid_all_loss': 0.0,
                         'mermaid_reg_loss': 0.0,
                         'mermaid_sim_loss': 0.0,
-                        'dice_SmLabel': 0.,
-                        'dice_SdLabel': 0.,
+                        'dice_SmLabel_in_CT': 0.,
+                        'dice_SdLabel_in_CT': 0.,
+                        'dice_SmLabel_in_CB': 0.,
+                        'dice_SdLabel_in_CB': 0.,
                     }
                     writer.flush()
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
@@ -232,8 +239,10 @@ class TrainR21:
                     'mermaid_all_loss': 0.0,
                     'mermaid_reg_loss': 0.0,
                     'mermaid_sim_loss': 0.0,
-                    'dice_SmLabel': 0.,
-                    'dice_SdLabel': 0.,
+                    'dice_SmLabel_in_CT': 0.,
+                    'dice_SdLabel_in_CT': 0.,
+                    'dice_SmLabel_in_CB': 0.,
+                    'dice_SdLabel_in_CB': 0.,
                 }
                 self.model.eval()
 
@@ -247,7 +256,8 @@ class TrainR21:
                         ct_sdlabel = images[4].cuda()
                         cb_sblabel = images[5].cuda()
                         cb_sdlabel = images[6].cuda()
-                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
+                        roi2_label = images[7].cuda()
+                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
 
                         loss_dict = self.model.loss_dict
                         for loss_key in eval_loss_dict:
@@ -259,15 +269,15 @@ class TrainR21:
                             images_to_show = {
                                 "ct_image": ct_image.cpu(),
                                 "cb_image": cb_image.cpu(),
-                                "warped_image": self.model.warped_image.detach().cpu()
+                                "warped_image": self.model.warped_moving_image.detach().cpu()
                             }
                             labels_to_show = {
                                 "ct_sblabel": ct_sblabel.cpu(),
                                 "ct_sdlabel": ct_sdlabel.cpu(),
                                 "cb_sblabel": cb_sblabel.cpu(),
                                 "cb_sdlabel": cb_sdlabel.cpu(),
-                                "warped_sblabel": self.model.warped_labels.detach().cpu()[:, [0], ...],
-                                "warped_sdlabel": self.model.warped_labels.detach().cpu()[:, [1], ...],
+                                "warped_sblabel": self.model.warped_moving_labels.detach().cpu()[:, [0], ...],
+                                "warped_sdlabel": self.model.warped_moving_labels.detach().cpu()[:, [1], ...],
                                 "roi_label": roi_label.cpu()
                             }
 
@@ -287,17 +297,18 @@ class TrainR21:
                     eval_loss_dict['mermaid_all_loss'] / val_iters_per_epoch,
                     eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch,
                     eval_loss_dict['mermaid_reg_loss'] / val_iters_per_epoch,
-                    eval_loss_dict['dice_SmLabel'] / val_iters_per_epoch,
-                    eval_loss_dict['dice_SdLabel'] / val_iters_per_epoch
+                    eval_loss_dict['dice_SmLabel_in_CB'] / val_iters_per_epoch,
+                    eval_loss_dict['dice_SdLabel_in_CB'] / val_iters_per_epoch
                 )
                 print(to_print)
-                if min_val_loss == 0.0 and current_epoch >= 20:
-                    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
-                if eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel'] > min_val_loss:
-                    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
+                # if min_val_loss == 0.0 and current_epoch >= 20:
+                #    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
+                if eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB'] > min_val_loss:
+                    min_val_loss = eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB']
                     save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
                     print("Writing current best eval model")
                     torch.save({'epoch': current_epoch,
+                                'min_val_loss': min_val_loss,
                                 'model_state_dict': self.model.state_dict(),
                                 'optimizer_state_dict': self.optimizer.state_dict()},
                                save_file)
@@ -305,6 +316,7 @@ class TrainR21:
                 if current_epoch % 20 == 0:
                     save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
                     torch.save({'epoch': current_epoch,
+                                'min_val_loss': min_val_loss,
                                 'model_state_dict': self.model.state_dict(),
                                 'optimizer_state_dict': self.optimizer.state_dict()},
                                save_file)
@@ -349,8 +361,8 @@ class TrainR21:
                                 "ct_sdlabel": ct_sdlabel.cpu(),
                                 "cb_sblabel": cb_sblabel.cpu(),
                                 "cb_sdlabel": cb_sdlabel.cpu(),
-                                "warped_sblabel": self.model.warped_labels.detach().cpu()[:, [0], ...],
-                                "warped_sdlabel": self.model.warped_labels.detach().cpu()[:, [1], ...],
+                                "warped_sblabel": self.model.warped_moving_labels.detach().cpu()[:, [0], ...],
+                                "warped_sdlabel": self.model.warped_moving_labels.detach().cpu()[:, [1], ...],
                                 "roi_label": roi_label.cpu()
                             }
 

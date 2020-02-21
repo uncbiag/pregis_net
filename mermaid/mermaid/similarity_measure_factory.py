@@ -49,7 +49,7 @@ class SimilarityMeasure(with_metaclass(ABCMeta, object)):
         :return: returns similarity measure
         """
         sz = I0.size()
-        sim = torch.zeros(1).type_as(I0)
+        sim = 1.0
 
         if I0Source is None and phi is None:
             raise ValueError("no implemented in multi-batch-channel way1")
@@ -555,6 +555,7 @@ class CustLNCCSimilarity(SimilarityMeasure):
         self.step = [[max(int((ksz + 1) * self.stride[scale_id]), 1) for ksz in self.kernel_sz[scale_id]] for scale_id
                      in range(self.num_scale)]
         self.filter = [torch.ones([1, 1] + self.kernel_sz[scale_id]).cuda() for scale_id in range(self.num_scale)]
+
         if self.dim == 1:
             self.conv = F.conv1d
         elif self.dim == 2:

@@ -13,7 +13,8 @@ def generate_img_list(patients, indices, mode='train'):
         ct_lists = sorted(glob.glob(os.path.join(patient, 'Cropped', 'planCT*')))
         cb_lists = sorted(glob.glob(os.path.join(patient, 'Cropped', 'CBCT*')))
         roi_label = os.path.join(patient, 'Cropped', 'planCT_OG', 'ROI_10.nii.gz')
-        assert os.path.isfile(roi_label)
+        roi2_label = os.path.join(patient, 'Cropped', 'planCT_OG', 'ROI_20.nii.gz')
+        assert os.path.isfile(roi_label) and os.path.isfile(roi2_label)
         for ct_list in ct_lists:
             ct_image = os.path.join(ct_list, 'image_normalized.nii.gz')
             ct_sblabel = os.path.join(ct_list, 'SmBowel_label.nii.gz')
@@ -27,8 +28,8 @@ def generate_img_list(patients, indices, mode='train'):
                 cb_sblabel = os.path.join(cb_list, 'SmBowel_label.nii.gz')
                 cb_sdlabel = os.path.join(cb_list, 'StomachDuo_label.nii.gz')
                 assert os.path.isfile(cb_image) and os.path.isfile(cb_sblabel) and os.path.isfile(cb_sdlabel)
-                img_line += "{} {} {} {} {} {} {}\n".format(ct_image, cb_image, roi_label,
-                                                      ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
+                img_line += "{} {} {} {} {} {} {} {}\n".format(ct_image, cb_image, roi_label,
+                                                      ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
     return img_line
 
 
@@ -38,6 +39,7 @@ if __name__ == '__main__':
 
     kf = KFold(n_splits=5, shuffle=True)
     fold = 1
+
     for train_index, test_index in kf.split(patients):
         print(train_index, test_index)
         train_line = generate_img_list(patients, train_index, 'train')

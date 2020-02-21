@@ -132,6 +132,9 @@ class TestR21:
             for j, images in enumerate(self.test_data_loader, 0):
                 ct_image_name = self.img_list[j].split(' ')[0]
                 cb_image_name = self.img_list[j].split(' ')[1]
+                roi_name = self.img_list[j].split(' ')[2]
+                ct_labels_name = self.img_list[j].split(' ')[3].replace('SmBowel_label', 'all_labels')
+                cb_labels_name = self.img_list[j].split(' ')[5].replace('SmBowel_label', 'all_labels')
 
                 if not ("OG" in ct_image_name and "OG" in cb_image_name):
                     continue
@@ -144,10 +147,14 @@ class TestR21:
                 ct_sdlabel = images[4].cuda()
                 cb_sblabel = images[5].cuda()
                 cb_sdlabel = images[6].cuda()
-                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
-                warped_image = self.model.warped_image
-                warped_sblabel = self.model.warped_labels[:, [0], ...]
-                warped_sdlabel = self.model.warped_labels[:, [1], ...]
+                roi2_label = images[7].cuda()
+                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
+                warped_moving_image = self.model.warped_moving_image
+                warped_target_image = self.model.warped_target_image
+                warped_moving_sblabel = self.model.warped_moving_labels[:, [0], ...]
+                warped_moving_sdlabel = self.model.warped_moving_labels[:, [1], ...]
+                warped_target_sblabel = self.model.warped_target_labels[:, [0], ...]
+                warped_target_sdlabel = self.model.warped_target_labels[:, [1], ...]
 
                 # phi = self.model.phi - self.model.identityMap
                 # for dim in range(3):
@@ -160,41 +167,81 @@ class TestR21:
                 os.system('mkdir -p {}'.format(result_folder))
                 orig_image_itk = sitk.ReadImage(ct_image_name)
 
+                copied_ct_image_file = os.path.join(result_folder, 'ct_image.nii.gz')
+                copied_cb_image_file = os.path.join(result_folder, 'cb_image.nii.gz')
+                copied_roi_file = os.path.join(result_folder, 'roi.nii.gz')
+                copied_ct_labels_file = os.path.join(result_folder, 'ct_labels.nii.gz')
+                copied_cb_labels_file = os.path.join(result_folder, 'cb_labels.nii.gz')
+
+                os.system('cp {} {}'.format(ct_image_name, copied_ct_image_file))
+                os.system('cp {} {}'.format(cb_image_name, copied_cb_image_file))
+                os.system('cp {} {}'.format(roi_name, copied_roi_file))
+                os.system('cp {} {}'.format(ct_labels_name, copied_ct_labels_file))
+                os.system('cp {} {}'.format(cb_labels_name, copied_cb_labels_file))
+
+
                 orig_image_arr = sitk.GetArrayFromImage(orig_image_itk)
                 [depth, height, width] = orig_image_arr.shape
-                # print("Original image shape: {}".format(orig_image_arr.shape))
+                print("Original image shape: {}".format(orig_image_arr.shape))
                 scale = [depth * 1.0 / self.settings.input_D,
                          height * 1.0 / self.settings.input_H * 1.0,
                          width * 1.0 / self.settings.input_W * 1.0]
-
-                orig_warped_image = F.interpolate(warped_image, scale_factor=scale, mode='trilinear')
-                orig_warped_sblabel = F.interpolate(warped_sblabel, scale_factor=scale, mode='nearest')
-                orig_warped_sdlabel = F.interpolate(warped_sdlabel, scale_factor=scale, mode='nearest')
                 # orig_phi_x = F.interpolate(phi[:, [0], ...], scale_factor=scale, mode='trilinear')
                 # orig_phi_y = F.interpolate(phi[:, [1], ...], scale_factor=scale, mode='trilinear')
                 # orig_phi_z = F.interpolate(phi[:, [2], ...], scale_factor=scale, mode='trilinear')
 
-                orig_warped_image_itk = sitk.GetImageFromArray(torch.squeeze(orig_warped_image).cpu().numpy())
-                orig_warped_image_itk.CopyInformation(orig_image_itk)
-                orig_warped_image_file = os.path.join(result_folder, 'warped_image.nii.gz')
-                sitk.WriteImage(orig_warped_image_itk, orig_warped_image_file)
+                orig_warped_moving_image = F.interpolate(warped_moving_image, scale_factor=scale, mode='trilinear')
+                orig_warped_moving_sblabel = F.interpolate(warped_moving_sblabel, scale_factor=scale, mode='nearest')
+                orig_warped_moving_sdlabel = F.interpolate(warped_moving_sdlabel, scale_factor=scale, mode='nearest')
 
-                orig_warped_sblabel_arr = torch.squeeze(orig_warped_sblabel).cpu().numpy().astype(np.uint8)
-                orig_warped_sblabel_itk = sitk.GetImageFromArray(orig_warped_sblabel_arr)
-                orig_warped_sblabel_itk.CopyInformation(orig_image_itk)
-                orig_warped_sblabel_file = os.path.join(result_folder, 'warped_sblabel.nii.gz')
-                sitk.WriteImage(orig_warped_sblabel_itk, orig_warped_sblabel_file)
+                orig_warped_moving_image_itk = sitk.GetImageFromArray(torch.squeeze(orig_warped_moving_image).cpu().numpy())
+                orig_warped_moving_image_itk.CopyInformation(orig_image_itk)
+                orig_warped_moving_image_file = os.path.join(result_folder, 'warped_moving_image.nii.gz')
+                sitk.WriteImage(orig_warped_moving_image_itk, orig_warped_moving_image_file)
 
-                orig_warped_sdlabel_arr = torch.squeeze(orig_warped_sdlabel).cpu().numpy().astype(np.uint8)
-                orig_warped_sdlabel_itk = sitk.GetImageFromArray(orig_warped_sdlabel_arr)
-                orig_warped_sdlabel_itk.CopyInformation(orig_image_itk)
-                orig_warped_sdlabel_file = os.path.join(result_folder, 'warped_sdlabel.nii.gz')
-                sitk.WriteImage(orig_warped_sdlabel_itk, orig_warped_sdlabel_file)
+                orig_warped_moving_sblabel_arr = torch.squeeze(orig_warped_moving_sblabel).cpu().numpy().astype(np.uint8)
+                orig_warped_moving_sblabel_itk = sitk.GetImageFromArray(orig_warped_moving_sblabel_arr)
+                orig_warped_moving_sblabel_itk.CopyInformation(orig_image_itk)
+                orig_warped_moving_sblabel_file = os.path.join(result_folder, 'warped_moving_sblabel.nii.gz')
+                sitk.WriteImage(orig_warped_moving_sblabel_itk, orig_warped_moving_sblabel_file)
 
-                all_labels_itk = mergeFilter.Execute([sitk.Cast(orig_warped_sblabel_itk, sitk.sitkLabelUInt8),
-                                                      sitk.Cast(orig_warped_sdlabel_itk, sitk.sitkLabelUInt8)])
-                all_labels_file = os.path.join(result_folder, 'warped_labels.nii.gz')
-                sitk.WriteImage(sitk.Cast(all_labels_itk, sitk.sitkUInt8), all_labels_file)
+                orig_warped_moving_sdlabel_arr = torch.squeeze(orig_warped_moving_sdlabel).cpu().numpy().astype(np.uint8)
+                orig_warped_moving_sdlabel_itk = sitk.GetImageFromArray(orig_warped_moving_sdlabel_arr)
+                orig_warped_moving_sdlabel_itk.CopyInformation(orig_image_itk)
+                orig_warped_moving_sdlabel_file = os.path.join(result_folder, 'warped_moving_sdlabel.nii.gz')
+                sitk.WriteImage(orig_warped_moving_sdlabel_itk, orig_warped_moving_sdlabel_file)
+
+                all_moving_labels_itk = mergeFilter.Execute([sitk.Cast(orig_warped_moving_sblabel_itk, sitk.sitkLabelUInt8),
+                                                             sitk.Cast(orig_warped_moving_sdlabel_itk, sitk.sitkLabelUInt8)])
+                all_moving_labels_file = os.path.join(result_folder, 'warped_moving_labels.nii.gz')
+                sitk.WriteImage(sitk.Cast(all_moving_labels_itk, sitk.sitkUInt8), all_moving_labels_file)
+
+
+                orig_warped_target_image = F.interpolate(warped_target_image, scale_factor=scale, mode='trilinear')
+                orig_warped_target_sblabel = F.interpolate(warped_target_sblabel, scale_factor=scale, mode='nearest')
+                orig_warped_target_sdlabel = F.interpolate(warped_target_sdlabel, scale_factor=scale, mode='nearest')
+
+                orig_warped_target_image_itk = sitk.GetImageFromArray(torch.squeeze(orig_warped_target_image).cpu().numpy())
+                orig_warped_target_image_itk.CopyInformation(orig_image_itk)
+                orig_warped_target_image_file = os.path.join(result_folder, 'warped_target_image.nii.gz')
+                sitk.WriteImage(orig_warped_target_image_itk, orig_warped_target_image_file)
+
+                orig_warped_target_sblabel_arr = torch.squeeze(orig_warped_target_sblabel).cpu().numpy().astype(np.uint8)
+                orig_warped_target_sblabel_itk = sitk.GetImageFromArray(orig_warped_target_sblabel_arr)
+                orig_warped_target_sblabel_itk.CopyInformation(orig_image_itk)
+                orig_warped_target_sblabel_file = os.path.join(result_folder, 'warped_target_sblabel.nii.gz')
+                sitk.WriteImage(orig_warped_target_sblabel_itk, orig_warped_target_sblabel_file)
+
+                orig_warped_target_sdlabel_arr = torch.squeeze(orig_warped_target_sdlabel).cpu().numpy().astype(np.uint8)
+                orig_warped_target_sdlabel_itk = sitk.GetImageFromArray(orig_warped_target_sdlabel_arr)
+                orig_warped_target_sdlabel_itk.CopyInformation(orig_image_itk)
+                orig_warped_target_sdlabel_file = os.path.join(result_folder, 'warped_target_sdlabel.nii.gz')
+                sitk.WriteImage(orig_warped_target_sdlabel_itk, orig_warped_target_sdlabel_file)
+
+                all_target_labels_itk = mergeFilter.Execute([sitk.Cast(orig_warped_target_sblabel_itk, sitk.sitkLabelUInt8),
+                                                             sitk.Cast(orig_warped_target_sdlabel_itk, sitk.sitkLabelUInt8)])
+                all_target_labels_file = os.path.join(result_folder, 'warped_target_labels.nii.gz')
+                sitk.WriteImage(sitk.Cast(all_target_labels_itk, sitk.sitkUInt8), all_target_labels_file)
 
                 # orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
                 # print("Transformation map shape: {}".format(orig_phi.shape))
@@ -224,18 +271,25 @@ class TestR21:
                 # sd_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sdlabel).cpu().numpy(),
                 #                                               torch.squeeze(images[4]).numpy(),
                 #                                               torch.squeeze(images[2]).numpy())
-                sm_label_dice = self.__calculate_dice_score__(orig_warped_sblabel_arr, ct_sblabel_arr, roi_arr)
-                sd_label_dice = self.__calculate_dice_score__(orig_warped_sdlabel_arr, ct_sdlabel_arr, roi_arr)
-                print('{}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
-                                                      sd_label_bef,
-                                                      sm_label_dice,
-                                                      sd_label_dice))
-                f.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('images/')[1].replace('/', '_'),
-                                                             cb_image_name.split('images')[1].replace('/', '_'),
-                                                             sm_label_bef,
-                                                             sd_label_bef,
-                                                             sm_label_dice,
-                                                             sd_label_dice))
+                sm_label_dice = self.__calculate_dice_score__(orig_warped_moving_sblabel_arr, ct_sblabel_arr, roi_arr)
+                sd_label_dice = self.__calculate_dice_score__(orig_warped_moving_sdlabel_arr, ct_sdlabel_arr, roi_arr)
+
+                sm_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sblabel_arr, cb_sblabel_arr, roi_arr)
+                sd_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sdlabel_arr, cb_sdlabel_arr, roi_arr)
+                print('{}, {}, {}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
+                                                              sd_label_bef,
+                                                              sm_label_dice,
+                                                              sd_label_dice,
+                                                              sm_label_dice_2,
+                                                              sd_label_dice_2))
+
+
+                #f.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('images/')[1].replace('/', '_'),
+                #                                             cb_image_name.split('images')[1].replace('/', '_'),
+                #                                             sm_label_bef,
+                #                                             sd_label_bef,
+                #                                             sm_label_dice,
+                #                                             sd_label_dice))
 
                 # sm_label_bef = self.__calculate_dice_score__(cb_sblabel_arr, ct_sblabel_arr)
                 # sd_label_bef = self.__calculate_dice_score__(cb_sdlabel_arr, ct_sdlabel_arr)
@@ -258,7 +312,7 @@ class TestR21:
                 #                                               sm_label_dice,
                 #                                               sd_label_dice))
 
-        f.close()
+        # f.close()
         # f2.close()
 
 

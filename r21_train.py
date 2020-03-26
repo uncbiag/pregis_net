@@ -30,6 +30,8 @@ class TrainR21:
             self.root_folder = '/playpen/xhs400/Research/PycharmProjects/r21_net'
         elif hostname == 'biag-gpu1.cs.unc.edu':
             self.root_folder = '/playpen/xhs400/Research/PycharmProjects/r21_net'
+        elif "lambda" in hostname:
+            self.root_folder = '/playpen-raid/xhs400/Research/PycharmProjects/r21_net'       
         else:
             raise ValueError("Wrong host! Please configure.")
         assert (self.root_folder is not None)
@@ -129,6 +131,7 @@ class TrainR21:
             checkpoint = torch.load(self.network_file)
             if 'min_val_loss' in checkpoint:
                 min_val_loss = checkpoint['min_val_loss']
+                print(min_val_loss)
             if 'epoch' in checkpoint:
                 current_epoch = checkpoint['epoch'] + 1
             if 'optimizer_state_dict' in checkpoint:

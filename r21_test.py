@@ -31,6 +31,8 @@ class TestR21:
         hostname = socket.gethostname()
         if hostname == 'biag-w05.cs.unc.edu':
             self.root_folder = '/playpen/xhs400/Research/PycharmProjects/r21_net'
+        elif "lambda" in hostname:
+            self.root_folder = '/playpen-raid/xhs400/Research/PycharmProjects/r21_net'
         else:
             raise ValueError("Wrong host! Please configure.")
         assert (self.root_folder is not None)
@@ -182,7 +184,6 @@ class TestR21:
 
                 orig_image_arr = sitk.GetArrayFromImage(orig_image_itk)
                 [depth, height, width] = orig_image_arr.shape
-                print("Original image shape: {}".format(orig_image_arr.shape))
                 scale = [depth * 1.0 / self.settings.input_D,
                          height * 1.0 / self.settings.input_H * 1.0,
                          width * 1.0 / self.settings.input_W * 1.0]
@@ -271,17 +272,15 @@ class TestR21:
                 # sd_label_dice = self.__calculate_dice_score__(torch.squeeze(warped_sdlabel).cpu().numpy(),
                 #                                               torch.squeeze(images[4]).numpy(),
                 #                                               torch.squeeze(images[2]).numpy())
-                sm_label_dice = self.__calculate_dice_score__(orig_warped_moving_sblabel_arr, ct_sblabel_arr, roi_arr)
-                sd_label_dice = self.__calculate_dice_score__(orig_warped_moving_sdlabel_arr, ct_sdlabel_arr, roi_arr)
+                sm_label_dice = self.__calculate_dice_score__(orig_warped_moving_sblabel_arr, cb_sblabel_arr, roi_arr)
+                sd_label_dice = self.__calculate_dice_score__(orig_warped_moving_sdlabel_arr, cb_sdlabel_arr, roi_arr)
 
-                sm_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sblabel_arr, cb_sblabel_arr, roi_arr)
-                sd_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sdlabel_arr, cb_sdlabel_arr, roi_arr)
-                print('{}, {}, {}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
-                                                              sd_label_bef,
-                                                              sm_label_dice,
-                                                              sd_label_dice,
-                                                              sm_label_dice_2,
-                                                              sd_label_dice_2))
+                #sm_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sblabel_arr, ct_sblabel_arr, roi_arr)
+                #sd_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sdlabel_arr, ct_sdlabel_arr, roi_arr)
+                print('{}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
+                                                      sd_label_bef,
+                                                      sm_label_dice,
+                                                      sd_label_dice))
 
 
                 #f.write('{}__to_{}, {}, {}, {}, {}\n'.format(ct_image_name.split('images/')[1].replace('/', '_'),

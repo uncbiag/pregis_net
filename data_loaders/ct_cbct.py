@@ -313,8 +313,8 @@ class R21RegDataset(Dataset):
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
             roi2_lbl_arr = blosc.unpack_array(self.img_dict[roi2_lbl_name])
 
-            #ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
-            #cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
+            ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
+            cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
 
             return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
 

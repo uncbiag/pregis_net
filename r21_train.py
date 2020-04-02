@@ -171,8 +171,7 @@ class TrainR21:
                 ct_sdlabel = images[4].cuda()
                 cb_sblabel = images[5].cuda()
                 cb_sdlabel = images[6].cuda()
-                roi2_label = images[7].cuda()
-                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
+                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
 
                 loss_dict = self.model.loss_dict
                 loss_dict['mermaid_all_loss'].backward()
@@ -259,8 +258,7 @@ class TrainR21:
                         ct_sdlabel = images[4].cuda()
                         cb_sblabel = images[5].cuda()
                         cb_sdlabel = images[6].cuda()
-                        roi2_label = images[7].cuda()
-                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
+                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
 
                         loss_dict = self.model.loss_dict
                         for loss_key in eval_loss_dict:

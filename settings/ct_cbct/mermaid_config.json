@@ -40,7 +40,7 @@
             },
             "similarity_measure": {
                 "develop_mod_on": false,
-                "sigma": 1.0,
+                "sigma": 0.5,
                 "type": "custlncc",
                 "lncc":{
                     "resol_bound":[128,64],

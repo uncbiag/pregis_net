@@ -144,7 +144,7 @@ class MermaidNet(nn.Module):
 
         return mermaid_all_loss, mermaid_sim_loss, mermaid_reg_loss
 
-    def forward(self, ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label):
+    def forward(self, ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel):
         # cb_image: [-1, 1], cb_image_n: [0, 1]
         # ct: same
         cb_image_n = (cb_image + 1) / 2.
@@ -158,7 +158,7 @@ class MermaidNet(nn.Module):
         ct_image_n_and_label = torch.cat((ct_image_n, ct_sblabel, ct_sdlabel), dim=1)
 
         # add ROI to target space
-        cb_image_n_and_label = torch.cat((cb_image_n_and_label, roi2_label), dim=1)
+        cb_image_n_and_label = torch.cat((cb_image_n_and_label, roi_label), dim=1)
 
         init_map = self.identityMap
         self.loss_dict = {
@@ -172,7 +172,6 @@ class MermaidNet(nn.Module):
             'dice_SdLabel_in_CB': 0.,
         }
         momentum = self.__network_forward__(ct_image, cb_image, ct_labels, roi_label)
-
         warped_moving_image_n, warped_target_image_n = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels,
                                                                               target_image=cb_image_n, target_labels=cb_labels,
                                                                               momentum=momentum, init_map=init_map)

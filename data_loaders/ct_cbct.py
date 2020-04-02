@@ -135,7 +135,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_name = ith_info[4]
             cb_sblbl_name = ith_info[5]
             cb_sdlbl_name = ith_info[6]
-            roi2_lbl_name = ith_info[7]
             assert os.path.isfile(ct_img_name)
             assert os.path.isfile(cb_img_name)
             assert os.path.isfile(roi_lbl_name)
@@ -143,7 +142,6 @@ class R21RegDataset(Dataset):
             assert os.path.isfile(ct_sdlbl_name)
             assert os.path.isfile(cb_sblbl_name)
             assert os.path.isfile(cb_sdlbl_name)
-            assert os.path.isfile(roi2_lbl_name)
 
             ct_img_itk = sitk.ReadImage(ct_img_name)
             cb_img_itk = sitk.ReadImage(cb_img_name)
@@ -152,7 +150,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_itk = sitk.ReadImage(ct_sdlbl_name)
             cb_sblbl_itk = sitk.ReadImage(cb_sblbl_name)
             cb_sdlbl_itk = sitk.ReadImage(cb_sdlbl_name)
-            roi2_lbl_itk = sitk.ReadImage(roi2_lbl_name)
 
 
             # data processing
@@ -163,18 +160,17 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = sitk.GetArrayFromImage(ct_sdlbl_itk)
             cb_sblbl_arr = sitk.GetArrayFromImage(cb_sblbl_itk)
             cb_sdlbl_arr = sitk.GetArrayFromImage(cb_sdlbl_itk)
-            roi2_lbl_arr = sitk.GetArrayFromImage(roi2_lbl_itk)
 
             if self.mode == 'train':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
-                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr = \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_training_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
-                                                      ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr)
+                                                      ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
             elif self.mode == 'test' or self.mode == 'validate':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
-                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr = \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
-                                                     ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr)
+                                                     ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
             else:
                 raise ValueError("Mode Wrong! Only train and test are supported!")
 
@@ -185,7 +181,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = __nii2tensorarray__(ct_sdlbl_arr)
             cb_sblbl_arr = __nii2tensorarray__(cb_sblbl_arr)
             cb_sdlbl_arr = __nii2tensorarray__(cb_sdlbl_arr)
-            roi2_lbl_arr = __nii2tensorarray__(roi2_lbl_arr)
 
             self.img_dict[ct_img_name] = blosc.pack_array(ct_img_arr)
             self.img_dict[cb_img_name] = blosc.pack_array(cb_img_arr)
@@ -194,7 +189,6 @@ class R21RegDataset(Dataset):
             self.img_dict[ct_sdlbl_name] = blosc.pack_array(ct_sdlbl_arr)
             self.img_dict[cb_sblbl_name] = blosc.pack_array(cb_sblbl_arr)
             self.img_dict[cb_sdlbl_name] = blosc.pack_array(cb_sdlbl_arr)
-            self.img_dict[roi2_lbl_name] = blosc.pack_array(roi2_lbl_arr)
             count += 1
             pbar.update(count)
         pbar.finish()
@@ -211,7 +205,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_name = ith_info[4]
             cb_sblbl_name = ith_info[5]
             cb_sdlbl_name = ith_info[6]
-            roi2_lbl_name = ith_info[7]
             assert os.path.isfile(ct_img_name)
             assert os.path.isfile(cb_img_name)
             assert os.path.isfile(roi_lbl_name)
@@ -219,7 +212,6 @@ class R21RegDataset(Dataset):
             assert os.path.isfile(ct_sdlbl_name)
             assert os.path.isfile(cb_sblbl_name)
             assert os.path.isfile(cb_sdlbl_name)
-            assert os.path.isfile(roi2_lbl_name)
 
             ct_img_itk = sitk.ReadImage(ct_img_name)
             cb_img_itk = sitk.ReadImage(cb_img_name)
@@ -228,7 +220,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_itk = sitk.ReadImage(ct_sdlbl_name)
             cb_sblbl_itk = sitk.ReadImage(cb_sblbl_name)
             cb_sdlbl_itk = sitk.ReadImage(cb_sdlbl_name)
-            roi2_lbl_itk = sitk.ReadImage(roi2_lbl_name)
 
             # data processing
             ct_img_arr = sitk.GetArrayFromImage(ct_img_itk)
@@ -238,18 +229,17 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = sitk.GetArrayFromImage(ct_sdlbl_itk)
             cb_sblbl_arr = sitk.GetArrayFromImage(cb_sblbl_itk)
             cb_sdlbl_arr = sitk.GetArrayFromImage(cb_sdlbl_itk)
-            roi2_lbl_arr = sitk.GetArrayFromImage(roi2_lbl_itk)
 
             if self.mode == 'train':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
-                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr = \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_training_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
-                                                      ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr)
+                                                      ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
             elif self.mode == 'test' or self.mode == 'validate':
                 ct_img_arr, cb_img_arr, roi_lbl_arr, \
-                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr = \
+                ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr = \
                     self.__processing_testing_data__(ct_img_arr, cb_img_arr, roi_lbl_arr,
-                                                     ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr)
+                                                     ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr)
             else:
                 raise ValueError("Mode Wrong! Only train and test are supported!")
 
@@ -260,7 +250,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = __nii2tensorarray__(ct_sdlbl_arr)
             cb_sblbl_arr = __nii2tensorarray__(cb_sblbl_arr)
             cb_sdlbl_arr = __nii2tensorarray__(cb_sdlbl_arr)
-            roi2_lbl_arr = __nii2tensorarray__(roi2_lbl_arr)
 
             self.img_dict[ct_img_name] = blosc.pack_array(ct_img_arr)
             self.img_dict[cb_img_name] = blosc.pack_array(cb_img_arr)
@@ -269,7 +258,6 @@ class R21RegDataset(Dataset):
             self.img_dict[ct_sdlbl_name] = blosc.pack_array(ct_sdlbl_arr)
             self.img_dict[cb_sblbl_name] = blosc.pack_array(cb_sblbl_arr)
             self.img_dict[cb_sdlbl_name] = blosc.pack_array(cb_sdlbl_arr)
-            self.img_dict[roi2_lbl_name] = blosc.pack_array(roi2_lbl_arr)
 
     def __multi_threads_loading__(self):
         manager = multiprocessing.Manager()
@@ -302,7 +290,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_name = ith_info[4]
             cb_sblbl_name = ith_info[5]
             cb_sdlbl_name = ith_info[6]
-            roi2_lbl_name = ith_info[7]
 
             ct_img_arr = blosc.unpack_array(self.img_dict[ct_img_name])
             cb_img_arr = blosc.unpack_array(self.img_dict[cb_img_name])
@@ -311,12 +298,11 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = blosc.unpack_array(self.img_dict[ct_sdlbl_name])
             cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
-            roi2_lbl_arr = blosc.unpack_array(self.img_dict[roi2_lbl_name])
 
             ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
             cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
 
-            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
+            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 
         elif self.mode == 'validate' or self.mode == "test":
             # read image and labels
@@ -328,7 +314,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_name = ith_info[4]
             cb_sblbl_name = ith_info[5]
             cb_sdlbl_name = ith_info[6]
-            roi2_lbl_name = ith_info[7]
 
             ct_img_arr = blosc.unpack_array(self.img_dict[ct_img_name])
             cb_img_arr = blosc.unpack_array(self.img_dict[cb_img_name])
@@ -337,9 +322,8 @@ class R21RegDataset(Dataset):
             ct_sdlbl_arr = blosc.unpack_array(self.img_dict[ct_sdlbl_name])
             cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
-            roi2_lbl_arr = blosc.unpack_array(self.img_dict[roi2_lbl_name])
 
-            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
+            return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 
     def __drop_invalid_range__(self, volume, label=None):
         """
@@ -376,7 +360,7 @@ class R21RegDataset(Dataset):
         return data, label
 
     def __processing_training_data__(self, ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr,
-                                     cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr):
+                                     cb_sblbl_arr, cb_sdlbl_arr):
         # drop out the invalid range
         # data, label = self.__drop_invalid_range__(data, label)
 
@@ -393,16 +377,15 @@ class R21RegDataset(Dataset):
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
         cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
         cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
-        roi2_lbl_arr = self.__resize_data__(roi2_lbl_arr)
 
         # normalization datas
         # ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
         # cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
 
-        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
+        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 
     def __processing_testing_data__(self, ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr,
-                                    cb_sdlbl_arr, roi2_lbl_arr):
+                                    cb_sdlbl_arr):
         # resize data
         ct_img_arr = self.__resize_data__(ct_img_arr, order=3)
         cb_img_arr = self.__resize_data__(cb_img_arr, order=3)
@@ -411,10 +394,9 @@ class R21RegDataset(Dataset):
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
         cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
         cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
-        roi2_lbl_arr = self.__resize_data__(roi2_lbl_arr)
 
         # normalization datas
         # ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
         # cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
 
-        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr, roi2_lbl_arr
+        return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr

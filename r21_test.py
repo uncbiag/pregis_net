@@ -149,8 +149,7 @@ class TestR21:
                 ct_sdlabel = images[4].cuda()
                 cb_sblabel = images[5].cuda()
                 cb_sdlabel = images[6].cuda()
-                roi2_label = images[7].cuda()
-                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
+                self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
                 warped_moving_image = self.model.warped_moving_image
                 warped_target_image = self.model.warped_target_image
                 warped_moving_sblabel = self.model.warped_moving_labels[:, [0], ...]

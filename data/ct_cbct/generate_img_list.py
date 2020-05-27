@@ -10,27 +10,23 @@ def generate_img_list(patients, indices, mode='train'):
     patients = itemgetter(*indices)(patients)
     img_line = ""
     for patient in patients:
-        ct_lists = sorted(glob.glob(os.path.join(patient, 'Cropped', 'planCT*')))
-        cb_lists = sorted(glob.glob(os.path.join(patient, 'Cropped', 'CBCT*')))
-        roi_label = os.path.join(patient, 'Cropped', 'planCT_OG', 'ROI_25.nii.gz')
-        #roi2_label = os.path.join(patient, 'Cropped', 'planCT_OG', 'ROI_20.nii.gz')
-        #assert os.path.isfile(roi_label) and os.path.isfile(roi2_label)
+        ct_lists = sorted(glob.glob(os.path.join(patient, 'Processed', 'planCT*')))
+        cb_lists = sorted(glob.glob(os.path.join(patient, 'Processed', 'CBCT*')))
+        roi_label = os.path.join(patient, 'Processed', 'planCT_OG', 'roi_label.nii.gz')
         assert os.path.isfile(roi_label)
         for ct_list in ct_lists:
-            ct_image = os.path.join(ct_list, 'image_normalized.nii.gz')
+            ct_image = os.path.join(ct_list, 'normalized_image.nii.gz')
             ct_sblabel = os.path.join(ct_list, 'SmBowel_label.nii.gz')
             ct_sdlabel = os.path.join(ct_list, 'StomachDuo_label.nii.gz')
             assert os.path.isfile(ct_image) and os.path.isfile(ct_sblabel) and os.path.isfile(ct_sdlabel)
             for cb_list in cb_lists:
-                cb_image = os.path.join(cb_list, 'image_normalized.nii.gz')
+                cb_image = os.path.join(cb_list, 'normalized_image.nii.gz')
                 if mode == 'test':
                     if not 'OG' in ct_image or not 'OG' in cb_image:
                         continue
                 cb_sblabel = os.path.join(cb_list, 'SmBowel_label.nii.gz')
                 cb_sdlabel = os.path.join(cb_list, 'StomachDuo_label.nii.gz')
                 assert os.path.isfile(cb_image) and os.path.isfile(cb_sblabel) and os.path.isfile(cb_sdlabel)
-                #img_line += "{} {} {} {} {} {} {} {}\n".format(ct_image, cb_image, roi_label,
-                #                                      ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel, roi2_label)
                 img_line += "{} {} {} {} {} {} {}\n".format(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
 
 
@@ -41,6 +37,7 @@ if __name__ == '__main__':
     root_folder = "/playpen-raid1/xhs400/Research/data/r21/data/ct-cbct/images"
     patients = sorted(glob.glob(os.path.join(root_folder, '18227??')))
 
+    print(len(patients))
     kf = KFold(n_splits=5, shuffle=True, random_state=42)
     fold = 1
 

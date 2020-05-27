@@ -157,9 +157,7 @@ class TestR21:
                 warped_target_sblabel = self.model.warped_target_labels[:, [0], ...]
                 warped_target_sdlabel = self.model.warped_target_labels[:, [1], ...]
 
-                # phi = self.model.phi - self.model.identityMap
-                # for dim in range(3):
-                #     phi[0, dim, ...] = phi[0, dim, ...] / self.model.spacing[dim]
+                phi = self.model.phi - self.model.identityMap
 
                 result_folder = os.path.join(self.test_folder,
                                              '{}__to_{}'.format(ct_image_name.split('images/')[1].replace('/', '_'),
@@ -182,13 +180,21 @@ class TestR21:
 
 
                 orig_image_arr = sitk.GetArrayFromImage(orig_image_itk)
+                spacing = 1. / (np.array(orig_image_arr.shape) - 1)
+
                 [depth, height, width] = orig_image_arr.shape
                 scale = [depth * 1.0 / self.settings.input_D,
                          height * 1.0 / self.settings.input_H * 1.0,
                          width * 1.0 / self.settings.input_W * 1.0]
-                # orig_phi_x = F.interpolate(phi[:, [0], ...], scale_factor=scale, mode='trilinear')
-                # orig_phi_y = F.interpolate(phi[:, [1], ...], scale_factor=scale, mode='trilinear')
-                # orig_phi_z = F.interpolate(phi[:, [2], ...], scale_factor=scale, mode='trilinear')
+
+                orig_phi_x = F.interpolate(phi[:, [0], ...], scale_factor=scale, mode='trilinear')
+                orig_phi_y = F.interpolate(phi[:, [1], ...], scale_factor=scale, mode='trilinear')
+                orig_phi_z = F.interpolate(phi[:, [2], ...], scale_factor=scale, mode='trilinear')
+
+                orig_phi_x[0, 0, ...] = orig_phi_x[0, 0, ...] / spacing[0]
+                orig_phi_y[0, 0, ...] = orig_phi_y[0, 0, ...] / spacing[1]
+                orig_phi_z[0, 0, ...] = orig_phi_z[0, 0, ...] / spacing[2]
+
 
                 orig_warped_moving_image = F.interpolate(warped_moving_image, scale_factor=scale, mode='trilinear')
                 orig_warped_moving_sblabel = F.interpolate(warped_moving_sblabel, scale_factor=scale, mode='nearest')
@@ -243,12 +249,12 @@ class TestR21:
                 all_target_labels_file = os.path.join(result_folder, 'warped_target_labels.nii.gz')
                 sitk.WriteImage(sitk.Cast(all_target_labels_itk, sitk.sitkUInt8), all_target_labels_file)
 
-                # orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
+                orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
                 # print("Transformation map shape: {}".format(orig_phi.shape))
-                # orig_phi_itk = sitk.GetImageFromArray(torch.squeeze(orig_phi).cpu().numpy(), isVector=True)
-                # orig_phi_itk.CopyInformation(orig_image_itk)
-                # orig_phi_file = os.path.join(result_folder, 'phi.nii')
-                # sitk.WriteImage(orig_phi_itk, orig_phi_file)
+                orig_phi_itk = sitk.GetImageFromArray(torch.squeeze(orig_phi).cpu().numpy(), isVector=True)
+                orig_phi_itk.CopyInformation(orig_image_itk)
+                orig_phi_file = os.path.join(result_folder, 'phi.nii')
+                sitk.WriteImage(orig_phi_itk, orig_phi_file)
 
                 ct_sblabel = self.img_list[j].split(' ')[3]
                 ct_sblabel_arr = sitk.GetArrayFromImage(sitk.ReadImage(ct_sblabel))

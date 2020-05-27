@@ -10,7 +10,7 @@ def parse_opts():
         help='Path for training image list file'
     )
     parser.add_argument(
-        '--test_list',
+        '--val_list',
         default='./data/ct_cbct/sample_test.txt',
         type=str,
         help='Path for testing image list file'

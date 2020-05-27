@@ -95,7 +95,7 @@ class TrainR21:
             self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
             os.system('mkdir -p ' + self.log_folder)
             os.system('cp ' + self.settings.train_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.train_list)))
-            os.system('cp ' + self.settings.test_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.test_list)))
+            os.system('cp ' + self.settings.val_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.val_list)))
             
         with open(self.network_config_file) as f:
             self.network_config = json.load(f)
@@ -111,7 +111,6 @@ class TrainR21:
         batch_size = self.network_config['train']['batch_size']
         iters_per_epoch = len(self.train_data_loader.dataset) // batch_size
         val_iters_per_epoch = len(self.validate_data_loader.dataset) // batch_size
-        # test_iters_per_epoch = len(self.test_data_loader.dataset) // batch_size
         summary_batch_period = min(self.network_config['train']['min_summary_period'], iters_per_epoch)
         validate_epoch_period = self.network_config['validate']['validate_epoch_period']
 

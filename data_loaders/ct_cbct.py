@@ -88,8 +88,8 @@ class R21RegDataset(Dataset):
                 # fold_num = int(len(img_list)/8)
                 # self.img_list = img_list[0: 6*fold_num]
         elif self.mode == 'validate':
-            print("Reading {}".format(settings.test_list))
-            with open(settings.test_list, 'r') as f:
+            print("Reading {}".format(settings.val_list))
+            with open(settings.val_list, 'r') as f:
                 self.img_list = [line.strip() for line in f]
                 # fold_num = int(len(img_list)/8)
                 # self.img_list = img_list[6*fold_num:]

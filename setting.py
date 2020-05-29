@@ -13,8 +13,14 @@ def parse_opts():
         '--val_list',
         default='./data/ct_cbct/sample_test.txt',
         type=str,
-        help='Path for testing image list file'
+        help='Path for validation image list file'
     )
+    parser.add_argument(
+        '--test_list',
+        default='./data/ct_cbct/sample_test.txt',
+        type=str,
+        help='Path for testing image list file'
+    )    
     parser.add_argument(
         '--input_D',
         default=128,

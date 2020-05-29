@@ -135,8 +135,8 @@ class TestR21:
                 ct_image_name = self.img_list[j].split(' ')[0]
                 cb_image_name = self.img_list[j].split(' ')[1]
                 roi_name = self.img_list[j].split(' ')[2]
-                ct_labels_name = self.img_list[j].split(' ')[3].replace('SmBowel_label', 'all_labels')
-                cb_labels_name = self.img_list[j].split(' ')[5].replace('SmBowel_label', 'all_labels')
+                ct_labels_name = self.img_list[j].split(' ')[3].replace('SmBowel_label', 'oar_label')
+                cb_labels_name = self.img_list[j].split(' ')[5].replace('SmBowel_label', 'oar_label')
 
                 if not ("OG" in ct_image_name and "OG" in cb_image_name):
                     continue

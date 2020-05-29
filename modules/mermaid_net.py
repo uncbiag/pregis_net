@@ -23,6 +23,7 @@ class MermaidNet(nn.Module):
         self.use_bn = model_config['pregis_net']['bn']
         print("Use Batch Normalization: {}".format(self.use_bn))
         self.use_dp = model_config['pregis_net']['dp']
+        self.dp_p = model_config['pregis_net']['dp_p']
         self.dim = model_config['dim']
         self.img_sz = model_config['img_sz']
         self.batch_size = self.img_sz[0]
@@ -200,7 +201,6 @@ class MermaidNet(nn.Module):
                                                                           roi_label)
         self.loss_dict['dice_SmLabel_in_CT'] = sm_label_dice / self.batch_size
         self.loss_dict['dice_SdLabel_in_CT'] = sd_label_dice / self.batch_size
-
         return
 
     def __mermaid_shoot__(self, moving_image, moving_labels, target_image, target_labels, momentum, init_map):
@@ -227,15 +227,6 @@ class MermaidNet(nn.Module):
                                                                      zero_boundary=True)
         warped_target_labels = py_utils.compute_warped_image_multiNC(target_labels, inv_phi, self.spacing, spline_order=0,
                                                                      zero_boundary=True)
-        # sanity_check_moving_labels = py_utils.compute_warped_image_multiNC(warped_moving_labels, inv_phi, self.spacing, spline_order=0,
-        #                                                                    zero_boundary=True)
-        # sanity_check_target_labels = py_utils.compute_warped_image_multiNC(warped_target_labels, phi, self.spacing, spline_order=0,
-        #                                                                    zero_boundary=True)
-        # sanity_sm_dice, sanity_sd_dice = self.__calculate_dice_score_multiN(moving_labels, sanity_check_moving_labels)
-        # print(sanity_sm_dice, sanity_sd_dice)
-        # sanity_sm_dice, sanity_sd_dice = self.__calculate_dice_score_multiN(target_labels, sanity_check_target_labels)
-        # print(sanity_sm_dice, sanity_sd_dice)
-
 
         self.warped_moving_labels = warped_moving_labels
         self.warped_target_labels = warped_target_labels
@@ -254,15 +245,8 @@ class MermaidNet(nn.Module):
         x_l3 = self.ec_8(x)
         x = self.ec_9(x_l3)
         x = self.ec_10(x)
-        # x_l4 = self.ec_11(x)
-        # x = self.ec_12(x_l4)
-        # x = self.ec_13(x)
 
         # Decode Momentum
-        # x = self.dc_14(x)
-        # x = torch.cat((x_l4, x), dim=1)
-        # x = self.dc_15(x)
-        # x = self.dc_16(x)
         x = self.dc_17(x)
         x = torch.cat((x_l3, x), dim=1)
         x = self.dc_18(x)
@@ -276,45 +260,33 @@ class MermaidNet(nn.Module):
 
     def __setup_network_structure__(self):
         self.ec_1 = ConBnRelDp(4, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=0.1)
         self.ec_2 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=0.1)
         self.ec_3 = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p))
         self.ec_4 = ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_5 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_6 = MaxPool(2, dim=self.dim)
         self.ec_7 = ConBnRelDp(32, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_8 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp)
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_9 = MaxPool(2, dim=self.dim)
         self.ec_10 = ConBnRelDp(64, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.ec_11 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                         use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.ec_12 = MaxPool(2, dim=self.dim)
-        # self.ec_13 = ConBnRelDp(128, 256, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                         use_bn=self.use_bn, use_dp=self.use_dp)
-
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         # decoder for momentum
-        # self.dc_14 = ConBnRelDp(256, 128, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-        #                         use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
-        # self.dc_15 = ConBnRelDp(256, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                         use_bn=self.use_bn, use_dp=self.use_dp)
-        # self.dc_16 = ConBnRelDp(128, 128, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-        #                         use_bn=self.use_bn, use_dp=self.use_dp)
         self.dc_17 = ConBnRelDp(128, 64, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p, reverse=True)
         self.dc_18 = ConBnRelDp(128, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.dc_19 = ConBnRelDp(64, 64, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.dc_20 = ConBnRelDp(64, 32, kernel_size=2, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp, reverse=True)
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p, reverse=True)
         self.dc_21 = ConBnRelDp(64, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
-                                use_bn=self.use_bn, use_dp=self.use_dp)
+                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.dc_22 = ConBnRelDp(32, 16, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')
         self.dc_23 = ConBnRelDp(16, self.dim, kernel_size=3, stride=1, dim=self.dim, activate_unit='None')

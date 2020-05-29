@@ -4,13 +4,13 @@
             "n_of_feature": 32,
             "bn": true,
             "dp": true,
-            "dp_p": 0.2
+            "dp_p": 0.5
         }
     },
     "train":{
         "dataset": "ct_cbct",
         "dataset_type": "with_contours",
-        "n_of_epochs":800,
+        "n_of_epochs":400,
         "batch_size":4,
         "min_summary_period":8,
         "optimizer":{

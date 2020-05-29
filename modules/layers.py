@@ -42,7 +42,7 @@ class MaxUnpool(nn.Module):
 class ConBnRelDp(nn.Module):
     # conv + batch_normalize + relu + dropout
     def __init__(self, in_ch, out_ch, kernel_size, stride=1, activate_unit='relu', same_padding=True,
-                 use_bn=False, use_dp=False, reverse=False, group=1, dilation=1, dim=3):
+                 use_bn=False, use_dp=False, p=0.2, reverse=False, group=1, dilation=1, dim=3):
         super(ConBnRelDp, self).__init__()
         padding = int((kernel_size - 1) / 2) if same_padding else 0
         if dim == 1:
@@ -80,7 +80,7 @@ class ConBnRelDp(nn.Module):
             self.activate_unit = nn.Sigmoid()
         else:
             self.activate_unit = False
-        self.drop_out = drop_out(0.2) if use_dp else False
+        self.drop_out = drop_out(p) if use_dp else False
 
         return
 

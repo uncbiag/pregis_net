@@ -14,11 +14,11 @@
                 "atol": 1e-5,
                 "smoother": {
                     "multi_gaussian_stds": [
+                        0.025,
                         0.05,
                         0.1,
                         0.15,
-                        0.2,
-                        0.25
+                        0.2
                     ],
                     "multi_gaussian_weights": [
                         0.06666666666666667,
@@ -40,7 +40,7 @@
             },
             "similarity_measure": {
                 "develop_mod_on": false,
-                "sigma": 0.5,
+                "sigma": 1.0,
                 "type": "custlncc",
                 "lncc":{
                     "resol_bound":[128,64],
@@ -56,7 +56,7 @@
             "env":{
                 "get_momentum_from_external_network":true,
                 "use_odeint":true,
-                "reg_factor":1.0
+                "reg_factor":10.0
                 },
             "shooting_vector_momentum":{
                 "use_velocity_mask_on_boundary":false

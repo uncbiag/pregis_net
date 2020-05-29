@@ -21,25 +21,6 @@ def __nii2tensorarray__(data):
     return new_data
 
 
-def __itensity_normalize_one_volume__(volume):
-    """
-    normalize the itensity of an nd volume based on the mean and std of nonzeor region
-    inputs:
-        volume: the input nd volume
-    outputs:
-        out: the normalized nd volume
-    """
-
-    bg = -1
-    pixels = volume[volume > bg]
-    mean = pixels.mean()
-    std = pixels.std()
-    out = (volume - mean) / std
-    # out_random = np.random.normal(0, 1, size = volume.shape)
-    # out[volume == bg] = out_random[volume == bg]
-    return out
-
-
 def __random_center_crop__(data, label):
     from random import random
     """
@@ -371,16 +352,11 @@ class R21RegDataset(Dataset):
         ct_img_arr = self.__resize_data__(ct_img_arr, order=3)
         cb_img_arr = self.__resize_data__(cb_img_arr, order=3)
 
-
         roi_lbl_arr = self.__resize_data__(roi_lbl_arr)
         ct_sblbl_arr = self.__resize_data__(ct_sblbl_arr)
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
         cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
         cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
-
-        # normalization datas
-        # ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
-        # cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
 
         return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 
@@ -394,9 +370,5 @@ class R21RegDataset(Dataset):
         ct_sdlbl_arr = self.__resize_data__(ct_sdlbl_arr)
         cb_sblbl_arr = self.__resize_data__(cb_sblbl_arr)
         cb_sdlbl_arr = self.__resize_data__(cb_sdlbl_arr)
-
-        # normalization datas
-        # ct_img_arr = self.__itensity_normalize_one_volume__(ct_img_arr)
-        # cb_img_arr = self.__itensity_normalize_one_volume__(cb_img_arr)
 
         return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr

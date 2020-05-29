@@ -34,7 +34,13 @@ def generate_img_list(patients, indices, mode='train'):
 
 
 if __name__ == '__main__':
-    root_folder = "/playpen-raid1/xhs400/Research/data/r21/data/ct-cbct/images"
+    hostname = socket.gethostname()
+    if hostname == 'biag-w05.cs.unc.edu':
+        root_folder = "/playpen1/xhs400/Research/data/r21/data/ct-cbct/images"
+    elif "lambda" in hostname:
+        root_folder = "/playpen-raid1/xhs400/Research/data/r21/data/ct-cbct/images"
+    else:
+        raise ValueError("Hostname Wrong")
     patients = sorted(glob.glob(os.path.join(root_folder, '18227??')))
 
     print(len(patients))

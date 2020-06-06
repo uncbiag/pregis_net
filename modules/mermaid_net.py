@@ -264,7 +264,7 @@ class MermaidNet(nn.Module):
         self.ec_2 = ConBnRelDp(1, 8, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp, p=0.1)
         self.ec_3 = ConBnRelDp(16, 16, kernel_size=3, stride=2, dim=self.dim, activate_unit='leaky_relu',
-                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p))
+                               use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_4 = ConBnRelDp(16, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',
                                use_bn=self.use_bn, use_dp=self.use_dp, p=self.dp_p)
         self.ec_5 = ConBnRelDp(32, 32, kernel_size=3, stride=1, dim=self.dim, activate_unit='leaky_relu',

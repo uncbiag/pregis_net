@@ -110,7 +110,7 @@ class R21RegDataset(Dataset):
             ith_info = image_list[idx].split(" ")
             ct_img_name = ith_info[0]
             cb_img_name = ith_info[1]
-            
+
             roi_lbl_name = ith_info[2]
             ct_sblbl_name = ith_info[3]
             ct_sdlbl_name = ith_info[4]
@@ -131,7 +131,6 @@ class R21RegDataset(Dataset):
             ct_sdlbl_itk = sitk.ReadImage(ct_sdlbl_name)
             cb_sblbl_itk = sitk.ReadImage(cb_sblbl_name)
             cb_sdlbl_itk = sitk.ReadImage(cb_sdlbl_name)
-
 
             # data processing
             ct_img_arr = sitk.GetArrayFromImage(ct_img_itk)
@@ -180,7 +179,7 @@ class R21RegDataset(Dataset):
             ith_info = self.img_list[idx].split(" ")
             ct_img_name = ith_info[0]
             cb_img_name = ith_info[1]
-            
+
             roi_lbl_name = ith_info[2]
             ct_sblbl_name = ith_info[3]
             ct_sdlbl_name = ith_info[4]
@@ -280,8 +279,12 @@ class R21RegDataset(Dataset):
             cb_sblbl_arr = blosc.unpack_array(self.img_dict[cb_sblbl_name])
             cb_sdlbl_arr = blosc.unpack_array(self.img_dict[cb_sdlbl_name])
 
+            # add random noise to images
             ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
             cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
+            # random shift roi
+            shift = np.random.randint(-5, 6, (3,))
+            roi_lbl_arr = np.roll(roi_lbl_arr, shift=tuple(shift), axis=(0, 1, 2))
 
             return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 

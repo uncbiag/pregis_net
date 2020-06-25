@@ -10,6 +10,11 @@ def parse_opts():
         help='Path for training image list file'
     )
     parser.add_argument(
+        '--use_val',
+        action='store_true',
+        help='use validate dataset'
+    )
+    parser.add_argument(
         '--val_list',
         default='./data/ct_cbct/sample_test.txt',
         type=str,

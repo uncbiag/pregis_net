@@ -60,7 +60,9 @@ class TrainR21:
         return
 
     def __load_models__(self):
-        self.train_data_loader, self.test_data_loader, self.validate_data_loader = create_dataloader(self.network_config, self.settings, self.view_test)
+        self.train_data_loader, \
+        self.test_data_loader, \
+        self.validate_data_loader = create_dataloader(self.network_config, self.settings)
         self.model = create_model(self.network_config['model'])
         self.optimizer, self.scheduler = create_optimizer(self.network_config['train'], self.model)
 
@@ -97,7 +99,6 @@ class TrainR21:
             self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
             os.system('mkdir -p ' + self.log_folder)
             os.system('cp ' + self.settings.train_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.train_list)))
-            #os.system('cp ' + self.settings.val_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.val_list)))
             os.system('cp ' + self.settings.test_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.test_list)))
             
         with open(self.network_config_file) as f:
@@ -151,8 +152,6 @@ class TrainR21:
                 'mermaid_all_loss': 0.0,
                 'mermaid_reg_loss': 0.0,
                 'mermaid_sim_loss': 0.0,
-                'dice_SmLabel_in_CT': 0.,
-                'dice_SdLabel_in_CT': 0.,
                 'dice_SmLabel_in_CB': 0.,
                 'dice_SdLabel_in_CB': 0.,
             }
@@ -231,109 +230,106 @@ class TrainR21:
                         'mermaid_all_loss': 0.0,
                         'mermaid_reg_loss': 0.0,
                         'mermaid_sim_loss': 0.0,
-                        'dice_SmLabel_in_CT': 0.,
-                        'dice_SdLabel_in_CT': 0.,
                         'dice_SmLabel_in_CB': 0.,
                         'dice_SdLabel_in_CB': 0.,
                     }
                     writer.flush()
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
-                eval_loss_dict = {
-                    'all_loss': 0.0,
-                    'mermaid_all_loss': 0.0,
-                    'mermaid_reg_loss': 0.0,
-                    'mermaid_sim_loss': 0.0,
-                    'dice_SmLabel_in_CT': 0.,
-                    'dice_SdLabel_in_CT': 0.,
-                    'dice_SmLabel_in_CB': 0.,
-                    'dice_SdLabel_in_CB': 0.,
-                }
-                self.model.eval()
+                if self.settings.use_val:
+                    eval_loss_dict = {
+                        'all_loss': 0.0,
+                        'mermaid_all_loss': 0.0,
+                        'mermaid_reg_loss': 0.0,
+                        'mermaid_sim_loss': 0.0,
+                        'dice_SmLabel_in_CB': 0.,
+                        'dice_SdLabel_in_CB': 0.,
+                    }
+                    self.model.eval()
 
-                with torch.no_grad():
-                    validate_index = np.random.randint(0, len(self.validate_data_loader))
-                    for j, images in enumerate(self.validate_data_loader, 0):
-                        ct_image = images[0].cuda()
-                        cb_image = images[1].cuda()
-                        roi_label = images[2].cuda()
-                        ct_sblabel = images[3].cuda()
-                        ct_sdlabel = images[4].cuda()
-                        cb_sblabel = images[5].cuda()
-                        cb_sdlabel = images[6].cuda()
-                        self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
+                    with torch.no_grad():
+                        validate_index = np.random.randint(0, len(self.validate_data_loader))
+                        for j, images in enumerate(self.validate_data_loader, 0):
+                            ct_image = images[0].cuda()
+                            cb_image = images[1].cuda()
+                            roi_label = images[2].cuda()
+                            ct_sblabel = images[3].cuda()
+                            ct_sdlabel = images[4].cuda()
+                            cb_sblabel = images[5].cuda()
+                            cb_sdlabel = images[6].cuda()
+                            self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
 
-                        loss_dict = self.model.loss_dict
-                        for loss_key in eval_loss_dict:
-                            if loss_key in loss_dict:
-                                eval_loss_dict[loss_key] += loss_dict[loss_key].item()
+                            loss_dict = self.model.loss_dict
+                            for loss_key in eval_loss_dict:
+                                if loss_key in loss_dict:
+                                    eval_loss_dict[loss_key] += loss_dict[loss_key].item()
 
-                        if j == validate_index:
-                            # view validation result
-                            images_to_show = {
-                                "ct_image": ct_image.cpu(),
-                                "cb_image": cb_image.cpu(),
-                                "warped_image": self.model.warped_moving_image.detach().cpu()
-                            }
-                            labels_to_show = {
-                                "ct_sblabel": ct_sblabel.cpu(),
-                                "ct_sdlabel": ct_sdlabel.cpu(),
-                                "cb_sblabel": cb_sblabel.cpu(),
-                                "cb_sdlabel": cb_sdlabel.cpu(),
-                                "warped_sblabel": self.model.warped_moving_labels.detach().cpu()[:, [0], ...],
-                                "warped_sdlabel": self.model.warped_moving_labels.detach().cpu()[:, [1], ...],
-                                "roi_label": roi_label.cpu()
-                            }
+                            if j == validate_index:
+                                # view validation result
+                                images_to_show = {
+                                    "ct_image": ct_image.cpu(),
+                                    "cb_image": cb_image.cpu(),
+                                    "warped_image": self.model.warped_moving_image.detach().cpu()
+                                }
+                                labels_to_show = {
+                                    "ct_sblabel": ct_sblabel.cpu(),
+                                    "ct_sdlabel": ct_sdlabel.cpu(),
+                                    "cb_sblabel": cb_sblabel.cpu(),
+                                    "cb_sdlabel": cb_sdlabel.cpu(),
+                                    "warped_sblabel": self.model.warped_moving_labels.detach().cpu()[:, [0], ...],
+                                    "warped_sdlabel": self.model.warped_moving_labels.detach().cpu()[:, [1], ...],
+                                    "roi_label": roi_label.cpu()
+                                }
 
-                            phis_to_show = [self.model.phi.detach().cpu()]
+                                phis_to_show = [self.model.phi.detach().cpu()]
 
-                            image_summary = make_image_summary(images_to_show, labels_to_show, phis_to_show)
-                            for key, value in image_summary.items():
-                                writer.add_image("validation_" + key, value, global_step=current_epoch)
+                                image_summary = make_image_summary(images_to_show, labels_to_show, phis_to_show)
+                                for key, value in image_summary.items():
+                                    writer.add_image("validation_" + key, value, global_step=current_epoch)
 
-                for loss_key in eval_loss_dict:
-                    writer.add_scalar('validation/validation_{}'.format(loss_key),
-                                      eval_loss_dict[loss_key] / val_iters_per_epoch, global_step=current_epoch)
+                    for loss_key in eval_loss_dict:
+                        writer.add_scalar('validation/validation_{}'.format(loss_key),
+                                          eval_loss_dict[loss_key] / val_iters_per_epoch, global_step=current_epoch)
 
-                to_print = "EVAL>{:0d}, all_loss:{:.6f}".format(current_epoch + 1,
-                                                                eval_loss_dict['all_loss'] / val_iters_per_epoch)
-                to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}, dice_sm:{:.6f}, dice_sd:{:.6f}".format(
-                    eval_loss_dict['mermaid_all_loss'] / val_iters_per_epoch,
-                    eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch,
-                    eval_loss_dict['mermaid_reg_loss'] / val_iters_per_epoch,
-                    eval_loss_dict['dice_SmLabel_in_CB'] / val_iters_per_epoch,
-                    eval_loss_dict['dice_SdLabel_in_CB'] / val_iters_per_epoch
-                )
-                print(to_print)
-                # if min_val_loss == 0.0 and current_epoch >= 20:
-                #    min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
-                if eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB'] > min_val_loss:
-                    min_val_loss = eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB']
-                    save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
-                    print("Writing current best eval model")
-                    torch.save({'epoch': current_epoch,
-                                'min_val_loss': min_val_loss,
-                                'model_state_dict': self.model.state_dict(),
-                                'optimizer_state_dict': self.optimizer.state_dict()},
-                               save_file)
+                    to_print = "EVAL>{:0d}, all_loss:{:.6f}".format(current_epoch + 1,
+                                                                    eval_loss_dict['all_loss'] / val_iters_per_epoch)
+                    to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}, dice_sm:{:.6f}, dice_sd:{:.6f}".format(
+                        eval_loss_dict['mermaid_all_loss'] / val_iters_per_epoch,
+                        eval_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch,
+                        eval_loss_dict['mermaid_reg_loss'] / val_iters_per_epoch,
+                        eval_loss_dict['dice_SmLabel_in_CB'] / val_iters_per_epoch,
+                        eval_loss_dict['dice_SdLabel_in_CB'] / val_iters_per_epoch
+                    )
+                    print(to_print)
+                    if min_val_loss == 0.0 and current_epoch >= 20:
+                       min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
+                    if eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB'] > min_val_loss:
+                        min_val_loss = eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB']
+                        save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
+                        print("Writing current best eval model")
+                        torch.save({'epoch': current_epoch,
+                                    'min_val_loss': min_val_loss,
+                                    'model_state_dict': self.model.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                   save_file)
 
-                if current_epoch % 20 == 0:
-                    save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
-                    torch.save({'epoch': current_epoch,
-                                'min_val_loss': min_val_loss,
-                                'model_state_dict': self.model.state_dict(),
-                                'optimizer_state_dict': self.optimizer.state_dict()},
-                               save_file)
-                writer.flush()
-                
-                """
+                    if current_epoch % 20 == 0:
+                        save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
+                        torch.save({'epoch': current_epoch,
+                                    'min_val_loss': min_val_loss,
+                                    'model_state_dict': self.model.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                   save_file)
+                    writer.flush()
+
                 test_loss_dict = {
                     'all_loss': 0.0,
                     'mermaid_all_loss': 0.0,
                     'mermaid_reg_loss': 0.0,
                     'mermaid_sim_loss': 0.0,
-                    'dice_SmLabel': 0.,
-                    'dice_SdLabel': 0.,
+                    'dice_SmLabel_in_CB': 0.,
+                    'dice_SdLabel_in_CB': 0.,
                 }
+                self.model.eval()
 
                 with torch.no_grad():
                     test_index = np.random.randint(0, len(self.test_data_loader))
@@ -353,11 +349,11 @@ class TrainR21:
                                 test_loss_dict[loss_key] += loss_dict[loss_key].item()
 
                         if j == test_index:
-                            # view validation result
+                            # view test result
                             images_to_show = {
                                 "ct_image": ct_image.cpu(),
                                 "cb_image": cb_image.cpu(),
-                                "warped_image": self.model.warped_image.detach().cpu()
+                                "warped_image": self.model.warped_moving_image.detach().cpu()
                             }
                             labels_to_show = {
                                 "ct_sblabel": ct_sblabel.cpu(),
@@ -377,20 +373,39 @@ class TrainR21:
 
                 for loss_key in test_loss_dict:
                     writer.add_scalar('test/test_{}'.format(loss_key),
-                                      test_loss_dict[loss_key] / test_iters_per_epoch, global_step=current_epoch)
+                                      test_loss_dict[loss_key] / val_iters_per_epoch, global_step=current_epoch)
 
                 to_print = "TEST>{:0d}, all_loss:{:.6f}".format(current_epoch + 1,
-                                                                test_loss_dict['all_loss'] /test_iters_per_epoch)
+                                                                test_loss_dict['all_loss'] / val_iters_per_epoch)
                 to_print = to_print + ", mermaid_loss:{:.6f}, sim_loss:{:.6f}, reg_loss:{:.6f}, dice_sm:{:.6f}, dice_sd:{:.6f}".format(
-                    test_loss_dict['mermaid_all_loss'] / test_iters_per_epoch,
-                    test_loss_dict['mermaid_sim_loss'] / test_iters_per_epoch,
-                    test_loss_dict['mermaid_reg_loss'] / test_iters_per_epoch,
-                    test_loss_dict['dice_SmLabel'] / test_iters_per_epoch,
-                    test_loss_dict['dice_SdLabel'] / test_iters_per_epoch
+                    test_loss_dict['mermaid_all_loss'] / val_iters_per_epoch,
+                    test_loss_dict['mermaid_sim_loss'] / val_iters_per_epoch,
+                    test_loss_dict['mermaid_reg_loss'] / val_iters_per_epoch,
+                    test_loss_dict['dice_SmLabel_in_CB'] / val_iters_per_epoch,
+                    test_loss_dict['dice_SdLabel_in_CB'] / val_iters_per_epoch
                 )
                 print(to_print)
+                if not self.settings.use_val:
+                    if min_val_loss == 0.0 and current_epoch >= 20:
+                        min_val_loss = test_loss_dict['dice_SmLabel'] + test_loss_dict['dice_SdLabel']
+                    if test_loss_dict['dice_SmLabel_in_CB'] + test_loss_dict['dice_SdLabel_in_CB'] > min_val_loss:
+                        min_val_loss = test_loss_dict['dice_SmLabel_in_CB'] + test_loss_dict['dice_SdLabel_in_CB']
+                        save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
+                        print("Writing current best eval model")
+                        torch.save({'epoch': current_epoch,
+                                    'min_val_loss': min_val_loss,
+                                    'model_state_dict': self.model.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    save_file)
+
+                    if current_epoch % 20 == 0:
+                        save_file = os.path.join(self.network_folder, 'eval_' + str(current_epoch) + '.pth.tar')
+                        torch.save({'epoch': current_epoch,
+                                    'min_val_loss': min_val_loss,
+                                    'model_state_dict': self.model.state_dict(),
+                                    'optimizer_state_dict': self.optimizer.state_dict()},
+                                    save_file)
                 writer.flush()
-                """
 
             current_epoch = current_epoch + 1
 

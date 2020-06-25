@@ -63,19 +63,22 @@ class R21RegDataset(Dataset):
         super(R21RegDataset, self).__init__()
         self.mode = mode
         if self.mode == 'train':
-            print("Reading {}".format(settings.train_list))
+            print("Reading training list{}".format(settings.train_list))
             with open(settings.train_list, 'r') as f:
-                self.img_list = [line.strip() for line in f]
-                # fold_num = int(len(img_list)/8)
-                # self.img_list = img_list[0: 6*fold_num]
+                img_list = [line.strip() for line in f]
+                if settings.use_val:
+                    fold_num = int(len(img_list)/8)
+                    self.img_list = img_list[0: 6*fold_num]
+                else:
+                    self.img_list = img_list
         elif self.mode == 'validate':
-            print("Reading {}".format(settings.val_list))
+            print("Reading validate list {}".format(settings.train_list))
             with open(settings.val_list, 'r') as f:
-                self.img_list = [line.strip() for line in f]
-                # fold_num = int(len(img_list)/8)
-                # self.img_list = img_list[6*fold_num:]
+                img_list = [line.strip() for line in f]
+                fold_num = int(len(img_list)/8)
+                self.img_list = img_list[6*fold_num:]
         elif self.mode == 'test':
-            print("Reading {}".format(settings.test_list))
+            print("Reading test list {}".format(settings.test_list))
             with open(settings.test_list, 'r') as f:
                 self.img_list = [line.strip() for line in f]
         self.num_of_workers = min(len(self.img_list), 20)
@@ -110,7 +113,6 @@ class R21RegDataset(Dataset):
             ith_info = image_list[idx].split(" ")
             ct_img_name = ith_info[0]
             cb_img_name = ith_info[1]
-
             roi_lbl_name = ith_info[2]
             ct_sblbl_name = ith_info[3]
             ct_sdlbl_name = ith_info[4]
@@ -282,9 +284,10 @@ class R21RegDataset(Dataset):
             # add random noise to images
             ct_img_arr += np.random.normal(0, 0.01, ct_img_arr.shape)
             cb_img_arr += np.random.normal(0, 0.01, cb_img_arr.shape)
+            
             # random shift roi
-            shift = np.random.randint(-5, 6, (3,))
-            roi_lbl_arr = np.roll(roi_lbl_arr, shift=tuple(shift), axis=(0, 1, 2))
+            #shift = np.random.randint(-5, 6, (3,))
+            #roi_lbl_arr = np.roll(roi_lbl_arr, shift=tuple(shift), axis=(0, 1, 2))
 
             return ct_img_arr, cb_img_arr, roi_lbl_arr, ct_sblbl_arr, ct_sdlbl_arr, cb_sblbl_arr, cb_sdlbl_arr
 

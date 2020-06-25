@@ -49,7 +49,9 @@ class TrainR21:
         # load models
         self.train_data_loader = None
         self.validate_data_loader = None
-        #self.test_data_loader = None
+        self.test_data_loader = None
+        self.use_val = False
+
         self.model = None
         self.optimizer = None
         self.scheduler = None
@@ -58,7 +60,7 @@ class TrainR21:
         return
 
     def __load_models__(self):
-        self.train_data_loader, self.validate_data_loader = create_dataloader(self.network_config, self.settings)
+        self.train_data_loader, self.test_data_loader, self.validate_data_loader = create_dataloader(self.network_config, self.settings, self.view_test)
         self.model = create_model(self.network_config['model'])
         self.optimizer, self.scheduler = create_optimizer(self.network_config['train'], self.model)
 
@@ -95,7 +97,8 @@ class TrainR21:
             self.log_folder = os.path.join(os.path.dirname(__file__), 'logs', my_name)
             os.system('mkdir -p ' + self.log_folder)
             os.system('cp ' + self.settings.train_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.train_list)))
-            os.system('cp ' + self.settings.val_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.val_list)))
+            #os.system('cp ' + self.settings.val_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.val_list)))
+            os.system('cp ' + self.settings.test_list + ' ' + os.path.join(self.network_folder, os.path.basename(self.settings.test_list)))
             
         with open(self.network_config_file) as f:
             self.network_config = json.load(f)

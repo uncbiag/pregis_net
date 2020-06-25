@@ -21,7 +21,7 @@ def generate_img_list(patients, indices, mode='train'):
             assert os.path.isfile(ct_image) and os.path.isfile(ct_sblabel) and os.path.isfile(ct_sdlabel)
             for cb_list in cb_lists:
                 cb_image = os.path.join(cb_list, 'normalized_image.nii.gz')
-                if mode == 'test':
+                if mode == 'val':
                     if not 'OG' in ct_image or not 'OG' in cb_image:
                         continue
                 cb_sblabel = os.path.join(cb_list, 'SmBowel_label.nii.gz')
@@ -55,8 +55,8 @@ if __name__ == '__main__':
         train_f.write(train_line)
         train_f.close()
 
-        test_line = generate_img_list(patients, test_index, 'test')
-        test_file = "test_{}.txt".format(fold)
+        test_line = generate_img_list(patients, test_index, 'val')
+        test_file = "val_{}.txt".format(fold)
         test_f = open(test_file, 'w')
         test_f.write(test_line)
         test_f.close()

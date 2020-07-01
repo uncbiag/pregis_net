@@ -52,8 +52,6 @@ class MermaidNet(nn.Module):
         self.loss_dict = None
         self.warped_moving_image = None
         self.warped_moving_labels = None
-        self.warped_target_image = None
-        self.warped_target_labels = None
 
         return
 
@@ -79,7 +77,7 @@ class MermaidNet(nn.Module):
                 mf = py_mf.ModelFactory(self.img_sz, self.spacing, self.lowResSize, self.lowResSpacing)
         else:
             raise ValueError("map_low_res_factor not defined")
-        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=True)
+        model, criterion = mf.create_registration_model(model_name, params['model'], compute_inverse_map=False)
 
         # Currently Must use map
         if self.use_map:
@@ -154,7 +152,6 @@ class MermaidNet(nn.Module):
         cb_labels = torch.cat((cb_sblabel, cb_sdlabel), dim=1)
 
         # moving: CT, target: CBCT
-        # movign: CB, target: CT
         cb_image_n_and_label = torch.cat((cb_image_n, cb_sblabel, cb_sdlabel), dim=1)
         ct_image_n_and_label = torch.cat((ct_image_n, ct_sblabel, ct_sdlabel), dim=1)
 
@@ -167,22 +164,17 @@ class MermaidNet(nn.Module):
             'mermaid_all_loss': 0.,
             'mermaid_sim_loss': 0.,
             'mermaid_reg_loss': 0.,
-            'dice_SmLabel_in_CT': 0.,
-            'dice_SdLabel_in_CT': 0.,
             'dice_SmLabel_in_CB': 0.,
             'dice_SdLabel_in_CB': 0.,
         }
         momentum = self.__network_forward__(ct_image, cb_image, ct_labels, roi_label)
-        warped_moving_image_n, warped_target_image_n = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels,
-                                                                              target_image=cb_image_n, target_labels=cb_labels,
-                                                                              momentum=momentum, init_map=init_map)
+        warped_moving_image_n = self.__mermaid_shoot__(moving_image=ct_image_n, moving_labels=ct_labels,
+                                                       target_image=cb_image_n, target_labels=cb_labels,
+                                                       momentum=momentum, init_map=init_map)
         # warped_image_n : [0, 1], warped_image: [-1, 1]
         warped_moving_image = warped_moving_image_n * 2 - 1
-        warped_target_image = warped_target_image_n * 2 - 1
 
         self.warped_moving_image = warped_moving_image
-        self.warped_target_image = warped_target_image
-
         all_loss, sim_loss, reg_loss = self.calculate_train_loss(moving_image_and_label=ct_image_n_and_label,
                                                                  target_image_and_label=cb_image_n_and_label)
         self.loss_dict['mermaid_all_loss'] = all_loss / self.batch_size
@@ -196,11 +188,6 @@ class MermaidNet(nn.Module):
                                                                           roi_label)
         self.loss_dict['dice_SmLabel_in_CB'] = sm_label_dice / self.batch_size
         self.loss_dict['dice_SdLabel_in_CB'] = sd_label_dice / self.batch_size
-
-        sm_label_dice, sd_label_dice = self.__calculate_dice_score_multiN(self.warped_target_labels.detach(), ct_labels,
-                                                                          roi_label)
-        self.loss_dict['dice_SmLabel_in_CT'] = sm_label_dice / self.batch_size
-        self.loss_dict['dice_SdLabel_in_CT'] = sd_label_dice / self.batch_size
         return
 
     def __mermaid_shoot__(self, moving_image, moving_labels, target_image, target_labels, momentum, init_map):
@@ -208,29 +195,20 @@ class MermaidNet(nn.Module):
         # warp image and labels
         self.mermaid_unit.m = momentum
         self.mermaid_criterion.m = momentum
-        low_res_phi, low_res_inv_phi = self.mermaid_unit(self.lowRes_fn(init_map), I0_source=moving_image, phi_inv=self.lowRes_fn(init_map))
+        low_res_phi = self.mermaid_unit(self.lowRes_fn(init_map), I0_source=moving_image)
         desired_sz = self.identityMap.size()[2:]
         phi = get_resampled_image(low_res_phi,
                                   self.lowResSpacing,
                                   desired_sz, 1, zero_boundary=False, identity_map=self.identityMap)
-        inv_phi = get_resampled_image(low_res_inv_phi,
-                                      self.lowResSpacing,
-                                      desired_sz, 1, zero_boundary=False, identity_map=self.identityMap)
         self.phi = phi
-        self.inv_phi = inv_phi
 
         warped_moving_image = py_utils.compute_warped_image_multiNC(moving_image, phi, self.spacing, spline_order=1,
                                                                     zero_boundary=True)
-        warped_target_image = py_utils.compute_warped_image_multiNC(target_image, inv_phi, self.spacing, spline_order=1,
-                                                                    zero_boundary=True)
         warped_moving_labels = py_utils.compute_warped_image_multiNC(moving_labels, phi, self.spacing, spline_order=0,
-                                                                     zero_boundary=True)
-        warped_target_labels = py_utils.compute_warped_image_multiNC(target_labels, inv_phi, self.spacing, spline_order=0,
                                                                      zero_boundary=True)
 
         self.warped_moving_labels = warped_moving_labels
-        self.warped_target_labels = warped_target_labels
-        return warped_moving_image, warped_target_image
+        return warped_moving_image
 
     def __network_forward__(self, ct_image, cb_image, ct_labels, roi_label):
         x1 = torch.cat((ct_image, ct_labels, roi_label), dim=1)

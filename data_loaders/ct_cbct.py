@@ -73,7 +73,7 @@ class R21RegDataset(Dataset):
                     self.img_list = img_list
         elif self.mode == 'validate':
             print("Reading validate list {}".format(settings.train_list))
-            with open(settings.val_list, 'r') as f:
+            with open(settings.train_list, 'r') as f:
                 img_list = [line.strip() for line in f]
                 fold_num = int(len(img_list)/8)
                 self.img_list = img_list[6*fold_num:]
@@ -81,14 +81,14 @@ class R21RegDataset(Dataset):
             print("Reading test list {}".format(settings.test_list))
             with open(settings.test_list, 'r') as f:
                 self.img_list = [line.strip() for line in f]
-        self.num_of_workers = min(len(self.img_list), 20)
+        self.num_of_workers = min(len(self.img_list), 16)
         print("Processing {} datas".format(len(self.img_list)))
         self.input_D = settings.input_D
         self.input_H = settings.input_H
         self.input_W = settings.input_W
 
         self.img_dict = {}
-        if self.num_of_workers == 20:
+        if self.num_of_workers == 16:
             multi_threads = True
         else:
             multi_threads = False

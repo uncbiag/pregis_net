@@ -114,7 +114,7 @@ class TrainR21:
         current_epoch = 0
         batch_size = self.network_config['train']['batch_size']
         iters_per_epoch = len(self.train_data_loader.dataset) // batch_size
-        val_iters_per_epoch = len(self.validate_data_loader.dataset) // batch_size
+        val_iters_per_epoch = len(self.test_data_loader.dataset) // batch_size
         summary_batch_period = min(self.network_config['train']['min_summary_period'], iters_per_epoch)
         validate_epoch_period = self.network_config['validate']['validate_epoch_period']
 
@@ -236,6 +236,7 @@ class TrainR21:
                     writer.flush()
             if current_epoch % validate_epoch_period == 0:  # validate every k epochs
                 if self.settings.use_val:
+                    assert self.validate_data_loader is not None
                     eval_loss_dict = {
                         'all_loss': 0.0,
                         'mermaid_all_loss': 0.0,
@@ -301,7 +302,7 @@ class TrainR21:
                     )
                     print(to_print)
                     if min_val_loss == 0.0 and current_epoch >= 20:
-                       min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
+                        min_val_loss = eval_loss_dict['dice_SmLabel'] + eval_loss_dict['dice_SdLabel']
                     if eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB'] > min_val_loss:
                         min_val_loss = eval_loss_dict['dice_SmLabel_in_CB'] + eval_loss_dict['dice_SdLabel_in_CB']
                         save_file = os.path.join(self.network_folder, 'best_eval.pth.tar')
@@ -333,7 +334,7 @@ class TrainR21:
 
                 with torch.no_grad():
                     test_index = np.random.randint(0, len(self.test_data_loader))
-                    for j, images in enumerate(self.test_data_loader, 0):
+                    for k, images in enumerate(self.test_data_loader, 0):
                         ct_image = images[0].cuda()
                         cb_image = images[1].cuda()
                         roi_label = images[2].cuda()
@@ -348,7 +349,7 @@ class TrainR21:
                             if loss_key in loss_dict:
                                 test_loss_dict[loss_key] += loss_dict[loss_key].item()
 
-                        if j == test_index:
+                        if k == test_index:
                             # view test result
                             images_to_show = {
                                 "ct_image": ct_image.cpu(),

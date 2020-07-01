@@ -151,11 +151,8 @@ class TestR21:
                 cb_sdlabel = images[6].cuda()
                 self.model(ct_image, cb_image, roi_label, ct_sblabel, ct_sdlabel, cb_sblabel, cb_sdlabel)
                 warped_moving_image = self.model.warped_moving_image
-                warped_target_image = self.model.warped_target_image
                 warped_moving_sblabel = self.model.warped_moving_labels[:, [0], ...]
                 warped_moving_sdlabel = self.model.warped_moving_labels[:, [1], ...]
-                warped_target_sblabel = self.model.warped_target_labels[:, [0], ...]
-                warped_target_sdlabel = self.model.warped_target_labels[:, [1], ...]
 
                 phi = self.model.phi - self.model.identityMap
 
@@ -223,32 +220,6 @@ class TestR21:
                 sitk.WriteImage(sitk.Cast(all_moving_labels_itk, sitk.sitkUInt8), all_moving_labels_file)
 
 
-                orig_warped_target_image = F.interpolate(warped_target_image, scale_factor=scale, mode='trilinear')
-                orig_warped_target_sblabel = F.interpolate(warped_target_sblabel, scale_factor=scale, mode='nearest')
-                orig_warped_target_sdlabel = F.interpolate(warped_target_sdlabel, scale_factor=scale, mode='nearest')
-
-                orig_warped_target_image_itk = sitk.GetImageFromArray(torch.squeeze(orig_warped_target_image).cpu().numpy())
-                orig_warped_target_image_itk.CopyInformation(orig_image_itk)
-                orig_warped_target_image_file = os.path.join(result_folder, 'warped_target_image.nii.gz')
-                sitk.WriteImage(orig_warped_target_image_itk, orig_warped_target_image_file)
-
-                orig_warped_target_sblabel_arr = torch.squeeze(orig_warped_target_sblabel).cpu().numpy().astype(np.uint8)
-                orig_warped_target_sblabel_itk = sitk.GetImageFromArray(orig_warped_target_sblabel_arr)
-                orig_warped_target_sblabel_itk.CopyInformation(orig_image_itk)
-                orig_warped_target_sblabel_file = os.path.join(result_folder, 'warped_target_sblabel.nii.gz')
-                sitk.WriteImage(orig_warped_target_sblabel_itk, orig_warped_target_sblabel_file)
-
-                orig_warped_target_sdlabel_arr = torch.squeeze(orig_warped_target_sdlabel).cpu().numpy().astype(np.uint8)
-                orig_warped_target_sdlabel_itk = sitk.GetImageFromArray(orig_warped_target_sdlabel_arr)
-                orig_warped_target_sdlabel_itk.CopyInformation(orig_image_itk)
-                orig_warped_target_sdlabel_file = os.path.join(result_folder, 'warped_target_sdlabel.nii.gz')
-                sitk.WriteImage(orig_warped_target_sdlabel_itk, orig_warped_target_sdlabel_file)
-
-                all_target_labels_itk = mergeFilter.Execute([sitk.Cast(orig_warped_target_sblabel_itk, sitk.sitkLabelUInt8),
-                                                             sitk.Cast(orig_warped_target_sdlabel_itk, sitk.sitkLabelUInt8)])
-                all_target_labels_file = os.path.join(result_folder, 'warped_target_labels.nii.gz')
-                sitk.WriteImage(sitk.Cast(all_target_labels_itk, sitk.sitkUInt8), all_target_labels_file)
-
                 orig_phi = torch.cat((orig_phi_x, orig_phi_y, orig_phi_z), dim=1).permute([0, 2, 3, 4, 1])
                 # print("Transformation map shape: {}".format(orig_phi.shape))
                 orig_phi_itk = sitk.GetImageFromArray(torch.squeeze(orig_phi).cpu().numpy(), isVector=True)
@@ -280,8 +251,6 @@ class TestR21:
                 sm_label_dice = self.__calculate_dice_score__(orig_warped_moving_sblabel_arr, cb_sblabel_arr, roi_arr)
                 sd_label_dice = self.__calculate_dice_score__(orig_warped_moving_sdlabel_arr, cb_sdlabel_arr, roi_arr)
 
-                #sm_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sblabel_arr, ct_sblabel_arr, roi_arr)
-                #sd_label_dice_2 = self.__calculate_dice_score__(orig_warped_target_sdlabel_arr, ct_sdlabel_arr, roi_arr)
                 print('{}, {}, {}, {}, {}, {}'.format(patient, cb_case, sm_label_bef,
                                                       sd_label_bef,
                                                       sm_label_dice,

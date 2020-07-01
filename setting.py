@@ -15,12 +15,6 @@ def parse_opts():
         help='use validate dataset'
     )
     parser.add_argument(
-        '--val_list',
-        default='./data/ct_cbct/sample_test.txt',
-        type=str,
-        help='Path for validation image list file'
-    )
-    parser.add_argument(
         '--test_list',
         default='./data/ct_cbct/sample_test.txt',
         type=str,
